@@ -1,0 +1,20 @@
+[Unit]
+Description=JJY time code transmitter
+After=chrony.service
+Wants=chrony.service
+
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/timeserver/server
+ExecStart=/usr/bin/python3 -m jjyd -c /etc/jjyd.toml
+Restart=always
+RestartSec=5
+# sysfs PWM と GPIO を操作するため root。ホームや他のFSは読み取り専用に。
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/sys/class/pwm
+LimitRTPRIO=50
+StateDirectory=jjyd
+
+[Install]
+WantedBy=multi-user.target

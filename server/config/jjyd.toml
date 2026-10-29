@@ -1,0 +1,20 @@
+# /etc/jjyd.toml
+[carrier]
+khz = 60          # 60 = 西日本(はがね山) / 40 = 東日本(おおたかどや山)。変更後は jjyd を再起動
+select_gpio = 26  # 基板の帯域切替(GPIO26)。40 のとき High、60 のとき Low。基板に無ければ行ごと削除
+pwm_chip = 0
+pwm_channel = 0   # dtoverlay=pwm,pin=18,func=2 の場合 GPIO18 = PWM0
+
+[level]
+gpio = 23         # 74LVC125 OE。Lowで最大振幅
+
+[timesync]
+check_interval_s = 30
+holdover_s = 21600   # 同期が途切れても送信を続ける最大時間(6時間)。超えたらキャリア停止
+
+# 基板上の DS3231 RTC(U2)+ CR2032(BT1)を使う。RTC が無い/読めない場合は自動で無視される。
+# 有効時、再起動直後に NTP 同期できなくても、前回同期から holdover_s 秒以内なら送信を許可する。
+[rtc]
+enabled = true
+holdover_s = 86400      # DS3231 は約±2ppm: 1日で0.2秒程度のずれ
+state_file = "/var/lib/jjyd/last_sync"

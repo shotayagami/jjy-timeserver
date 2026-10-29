@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "JJY")(type "KiCad")(uri "${KIPRJMOD}/JJY.kicad_sym")(options "")(descr "JJY HAT custom symbols"))
+)

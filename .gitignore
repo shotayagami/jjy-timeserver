@@ -1,0 +1,15 @@
+# KiCad のローカル状態・履歴・ロック
+.history/
+*.kicad_prl
+*.lck
+~*.lck
+fp-info-cache
+*-backups/
+*.bak
+# 生成・検査の一時物
+__pycache__/
+*.pyc
+drc.rpt
+DRC.rpt
+erc.rpt
+ERC.rpt
