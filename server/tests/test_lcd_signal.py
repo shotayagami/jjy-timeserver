@@ -64,6 +64,9 @@ class LedRuleTest(unittest.TestCase):
             def level(self, full):
                 events.append((time.time_ns(), "level", full))
 
+            def key(self, on):
+                pass
+
             def signal(self, on):
                 events.append((time.time_ns(), "signal", on))
 
@@ -92,6 +95,8 @@ class LedRuleTest(unittest.TestCase):
                 continue
             boundary = round(t / S) * S
             sym = encode_minute(datetime.fromtimestamp(boundary / S, JST))[int(boundary / S) % 60]
+            if sym == "C":  # 呼出符号秒は別テスト(CallsignTest)で確認
+                continue
             nxt = [e for e in events[i:] if e[1] == "signal" and e[2] is True]
             if not nxt:
                 continue

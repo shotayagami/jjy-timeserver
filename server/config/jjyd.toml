@@ -33,3 +33,17 @@ enabled = true
 bus = 1
 address = 0x3E
 contrast = 32
+
+# うるう秒(JJY の LS1/LS2 予告と、実施月1日 8:59 JST の 61 秒/59 秒フレーム)。
+# 予定は tzdata の leap-seconds.list から読む(無ければうるう秒なしとして送る)。
+# 壁時計がうるう秒で1秒戻る/進む必要があるので、chrony は既定の leapsecmode system のままにする
+# (スムージング(smoothtime/leapsecmode slew)を使うとうるう秒の位置が合わない)。
+[leap]
+enabled = true
+file = "/usr/share/zoneinfo/leap-seconds.list"
+
+# 毎時15・45分に呼出符号 "JJY"(モールス)と停波予告 ST を入れる NICT 準拠のフレームにする。既定は false。
+# "JJY" は NICT の局の呼出符号であり登録商標(T4355749)でもあるため、用途を理解したうえでのみ true にする。
+# false のときは15・45分も通常フレーム(年・曜日・うるう秒入り)を送る。電波時計の受信には false で十分。
+[callsign]
+enabled = false
