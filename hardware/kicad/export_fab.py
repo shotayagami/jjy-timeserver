@@ -27,8 +27,9 @@ def main():
     shutil.rmtree(FAB / "gerber", ignore_errors=True)
     (FAB / "gerber").mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as t:
-        for f in ("jjy-hat.kicad_pcb", "jjy-hat.kicad_pro", "jjy-hat.kicad_sch"):
+        for f in ("jjy-hat.kicad_pcb", "jjy-hat.kicad_pro", "jjy-hat.kicad_sch", "fp-lib-table", "sym-lib-table", "JJY.kicad_sym"):
             shutil.copy(HERE / f, t)
+        shutil.copytree(HERE / "JJY.pretty", Path(t) / "JJY.pretty")
         pcb = Path(t) / "jjy-hat.kicad_pcb"
         run("pcb", "drc", pcb, "-o", Path(t) / "drc.rpt", "--refill-zones", "--save-board", "--severity-error")
         g = FAB / "gerber"

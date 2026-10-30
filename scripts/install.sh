@@ -12,6 +12,10 @@ systemctl disable --now systemd-timesyncd 2>/dev/null || true
 # PWM0 を GPIO18 に出す
 CFG=/boot/firmware/config.txt
 grep -q '^dtoverlay=pwm,pin=18,func=2' "$CFG" || echo 'dtoverlay=pwm,pin=18,func=2' >> "$CFG"
+# I2C(RTC と LCD で使用)を有効化
+grep -q '^dtparam=i2c_arm=on' "$CFG" || echo 'dtparam=i2c_arm=on' >> "$CFG"
+# アナログ音声出力は PWM を使うため、同じ PWM ブロックを使うキャリアと衝突する。無効化する。
+sed -i 's/^dtparam=audio=on/dtparam=audio=off/' "$CFG"
 
 mkdir -p /opt/timeserver
 cp -r "$ROOT/server" /opt/timeserver/

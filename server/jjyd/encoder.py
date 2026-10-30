@@ -12,6 +12,10 @@ PULSE_WIDTH = {"M": 0.2, "1": 0.5, "0": 0.8}
 
 MARKER_SECONDS = (0, 9, 19, 29, 39, 49, 59)
 
+# 送信信号 LED: 高レベルが終わってから次の秒頭まで(= 低レベル期間)だけ点灯する。
+# ビット1 = 0.5 秒点灯、ビット0 = 0.2 秒点灯して消灯、マーカー = 0.8 秒点灯。
+LED_ON_SECONDS = {sym: round(1.0 - w, 3) for sym, w in PULSE_WIDTH.items()}
+
 
 def _bits(value: int, width: int) -> list[int]:
     return [(value >> i) & 1 for i in range(width - 1, -1, -1)]

@@ -1,7 +1,8 @@
 """拡張基板の制御。
 
 - キャリア: カーネルの sysfs PWM (GPIO18 / PWM0) で 40kHz or 60kHz の50%デューティ矩形波
-- 帯域:     GPIO26 (任意)。High=40kHz / Low=60kHz の共振コンデンサ切替
+- 帯域:     select_gpio (任意・旧 Rev B 基板用)。High=40kHz / Low=60kHz の共振コンデンサ切替。Rev C では不要
+- 信号LED:  GPIO24 (任意)。低レベル期間だけ点灯(ビット1=0.5秒、ビット0=0.2秒、マーカー=0.8秒)
 - 振幅:     GPIO23 (74LVC125 の OE、アクティブLow)。ON=最大振幅 / OFF=約10%
 """
 import logging
@@ -13,7 +14,7 @@ log = logging.getLogger("jjyd.tx")
 
 class Transmitter:
     def __init__(self, khz: int, pwm_chip: int, pwm_channel: int, level_gpio: int,
-                 select_gpio: int | None = None):
+                 select_gpio: int | None = None, signal_gpio: int | None = None):
         from gpiozero import DigitalOutputDevice  # Pi 以外では import しない
 
         self.freq_hz = khz * 1000
@@ -31,6 +32,8 @@ class Transmitter:
         self.select_dev = None
         if select_gpio is not None:
             self.select_dev = DigitalOutputDevice(select_gpio, initial_value=(khz == 40))
+        # 送信信号 LED(任意): 低レベル期間だけ点灯させる
+        self.signal_dev = DigitalOutputDevice(signal_gpio, initial_value=False) if signal_gpio is not None else None
         self.carrier_on = False
         self.set_carrier(False)
 
@@ -47,11 +50,16 @@ class Transmitter:
             self._w("enable", 1)
         else:
             self.level(False)
+            self.signal(False)
             self._w("enable", 0)
         self.carrier_on = on
 
     def level(self, full: bool) -> None:
         self.level_dev.value = 1 if full else 0
+
+    def signal(self, on: bool) -> None:
+        if self.signal_dev is not None:
+            self.signal_dev.value = 1 if on else 0
 
     def close(self) -> None:
         try:
@@ -60,6 +68,8 @@ class Transmitter:
             self.level_dev.close()
             if self.select_dev is not None:
                 self.select_dev.close()
+            if self.signal_dev is not None:
+                self.signal_dev.close()
 
 
 class DryRunTransmitter:
@@ -75,6 +85,9 @@ class DryRunTransmitter:
     def level(self, full: bool) -> None:
         t = time.time_ns()
         log.info("level %-4s  at +%.3f s", "FULL" if full else "LOW", (t % 1_000_000_000) / 1e9)
+
+    def signal(self, on: bool) -> None:
+        log.info("signal LED %s", "ON" if on else "off")
 
     def close(self) -> None:
         pass

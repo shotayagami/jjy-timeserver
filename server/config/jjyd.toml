@@ -1,7 +1,9 @@
 # /etc/jjyd.toml
 [carrier]
 khz = 60          # 60 = 西日本(はがね山) / 40 = 東日本(おおたかどや山)。変更後は jjyd を再起動
-select_gpio = 26  # 基板の帯域切替(GPIO26)。40 のとき High、60 のとき Low。基板に無ければ行ごと削除
+# 40/60kHz の切替はこの khz だけで行う。
+# 共振オプション(外付けアンテナ用の K1・C7〜C9 を実装した場合のみ)は、下の行を有効にする(GPIO21 = J1 の 40 番ピン):
+# select_gpio = 21
 pwm_chip = 0
 pwm_channel = 0   # dtoverlay=pwm,pin=18,func=2 の場合 GPIO18 = PWM0
 
@@ -18,3 +20,16 @@ holdover_s = 21600   # 同期が途切れても送信を続ける最大時間(6�
 enabled = true
 holdover_s = 86400      # DS3231 は約±2ppm: 1日で0.2秒程度のずれ
 state_file = "/var/lib/jjyd/last_sync"
+
+# 送信信号 LED(基板の D2 / GPIO24)。低レベル期間だけ点灯: ビット1=0.5秒、ビット0=0.2秒、マーカー=0.8秒。
+# 基板に無ければ [signal] ごと削除。
+[signal]
+gpio = 24
+
+# 現在時刻を表示する 16x2 文字 LCD(I2C、ST7032 系 AQM1602 など。基板の J3)。
+# 表示が薄い/濃いときは contrast(0〜63)を調整。LCD が無ければ enabled = false。
+[lcd]
+enabled = true
+bus = 1
+address = 0x3E
+contrast = 32

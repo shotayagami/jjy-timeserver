@@ -7,6 +7,7 @@ import tomllib
 from datetime import datetime
 
 from .encoder import JST, PULSE_WIDTH, encode_minute
+from .lcd import DryRunLcd, Lcd, LinuxI2C, format_lines
 from .timesync import SyncMonitor, rtc_present
 from .transmitter import DryRunTransmitter, Transmitter
 
@@ -25,7 +26,28 @@ def sleep_until(target_ns: int) -> None:
             time.sleep((rem - 2_000_000) / 1e9)
 
 
-def run(tx, monitor: SyncMonitor, stop: dict) -> None:
+class Display:
+    """LCD 表示。失敗しても送信は止めない(3回続けて失敗したら表示だけ諦める)。"""
+
+    def __init__(self, lcd, khz: int):
+        self.lcd, self.khz, self.fails = lcd, khz, 0
+
+    def update(self, dt: datetime, state: str) -> None:
+        if self.lcd is None:
+            return
+        try:
+            self.lcd.show(*format_lines(dt, self.khz, state))
+            self.fails = 0
+        except Exception as e:  # I2C の一時的なエラー
+            self.fails += 1
+            log.warning("LCD write failed (%d): %s", self.fails, e)
+            if self.fails >= 3:
+                log.error("LCD disabled after repeated failures")
+                self.lcd = None
+
+
+def run(tx, monitor: SyncMonitor, stop: dict, display: Display | None = None) -> None:
+    display = display or Display(None, 0)
     cur_minute, frame = None, None
     while not stop["flag"]:
         boundary = (time.time_ns() // S + 1) * S
@@ -33,10 +55,13 @@ def run(tx, monitor: SyncMonitor, stop: dict) -> None:
         if time.time_ns() - boundary > MAX_LATE_NS:
             log.warning("missed second boundary, skipping")
             continue
+        now = datetime.fromtimestamp(boundary // S, JST)
 
         if monitor.ok != tx.carrier_on:
             tx.set_carrier(monitor.ok)
         if not monitor.ok:
+            tx.signal(False)
+            display.update(now, "OFF")
             continue
 
         minute = boundary // (60 * S)
@@ -45,9 +70,12 @@ def run(tx, monitor: SyncMonitor, stop: dict) -> None:
             frame, cur_minute = encode_minute(t), minute
             log.info("frame %s JST", t.strftime("%Y-%m-%d %H:%M (%a)"))
         sym = frame[(boundary // S) % 60]
+        tx.signal(False)  # 高レベル(最大振幅)の間は消灯
         tx.level(True)
         sleep_until(boundary + int(PULSE_WIDTH[sym] * S))
         tx.level(False)
+        tx.signal(True)  # 低レベルの間(次の秒頭まで)点灯: ビット1=0.5s、ビット0=0.2s、マーカー=0.8s
+        display.update(now, "TX")  # 信号の立ち下がり後に書く(送信タイミングを乱さない)
 
 
 def main() -> None:
@@ -69,7 +97,7 @@ def main() -> None:
         with open(args.config, "rb") as fp:
             cfg = tomllib.load(fp)
     c, lv, ts = cfg.get("carrier", {}), cfg.get("level", {}), cfg.get("timesync", {})
-    rtc = cfg.get("rtc", {})
+    rtc, sg, lcd_cfg = cfg.get("rtc", {}), cfg.get("signal", {}), cfg.get("lcd", {})
 
     state_file = None
     if rtc.get("enabled", False):
@@ -79,12 +107,21 @@ def main() -> None:
             log.warning("[rtc] enabled but /sys/class/rtc/rtc0 not found; RTC mode ignored")
     monitor = SyncMonitor(ts.get("check_interval_s", 30), ts.get("holdover_s", 21600),
                           state_file=state_file, rtc_holdover_s=rtc.get("holdover_s", 86400))
+    khz = c.get("khz", 60)
+    lcd = None
     if args.dry_run:
         monitor.checker = lambda: True
         tx = DryRunTransmitter()
+        if lcd_cfg.get("enabled", False):
+            lcd = DryRunLcd()
     else:
-        tx = Transmitter(c.get("khz", 60), c.get("pwm_chip", 0), c.get("pwm_channel", 0), lv.get("gpio", 23),
-                         select_gpio=c.get("select_gpio"))
+        tx = Transmitter(khz, c.get("pwm_chip", 0), c.get("pwm_channel", 0), lv.get("gpio", 23),
+                         select_gpio=c.get("select_gpio"), signal_gpio=sg.get("gpio"))
+        if lcd_cfg.get("enabled", False):
+            try:
+                lcd = Lcd(LinuxI2C(lcd_cfg.get("bus", 1), lcd_cfg.get("address", 0x3E)), lcd_cfg.get("contrast", 32))
+            except Exception as e:  # LCD が無くても送信は続ける
+                log.warning("LCD not available: %s", e)
         try:  # 可能ならリアルタイム優先度
             os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(20))
         except (PermissionError, AttributeError, OSError):
@@ -96,8 +133,10 @@ def main() -> None:
 
     monitor.start()
     try:
-        run(tx, monitor, stop)
+        run(tx, monitor, stop, Display(lcd, khz))
     finally:
+        if lcd is not None:
+            lcd.close()
         tx.close()
 
 

@@ -52,10 +52,14 @@ def kid(node, name):
 
 
 # ---------------------------------------------------------------- フットプリント
+LOCAL_FP = {}  # プロジェクト内フットプリントライブラリ: {"JJY": Path(...pretty)}
+
+
 @lru_cache(maxsize=None)
 def load_fp(fp_id: str):
     lib, name = fp_id.split(":")
-    return parse((SHARE / "footprints" / f"{lib}.pretty" / f"{name}.kicad_mod").read_text(encoding="utf-8"))
+    base = LOCAL_FP.get(lib) or (SHARE / "footprints" / f"{lib}.pretty")
+    return parse((base / f"{name}.kicad_mod").read_text(encoding="utf-8"))
 
 
 def pad_infos(fp_id: str):
@@ -79,7 +83,7 @@ def _num(x: float) -> str:
     return f"{x:.6f}".rstrip("0").rstrip(".") or "0"
 
 
-def embed_fp(fp_id, ref, value, at, uuid_fn, net_of, sch_path_uuid, dnp=False):
+def embed_fp(fp_id, ref, value, at, uuid_fn, net_of, sch_path_uuid, dnp=False, ref_text=None):
     """ライブラリのフットプリントを基板用に変換して文字列で返す。
 
     at: (x, y, 回転角)  uuid_fn(tag) -> uuid 文字列  net_of(pad番号) -> (net番号, ネット名) | None
@@ -97,13 +101,25 @@ def embed_fp(fp_id, ref, value, at, uuid_fn, net_of, sch_path_uuid, dnp=False):
             continue
         if c[0] == "property" and c[1] == "Reference":
             c[2] = Q(ref)
-            kid(c, "layer")[1] = Q("F.Fab")  # 部品番号はシルクではなく Fab 層(パッド上のシルク衝突を避ける)
+            if ref_text == "hide":
+                c.insert(-1, ["hide", "yes"])
+            elif ref_text:
+                at = kid(c, "at")
+                at[1:] = [_num(ref_text[0]), _num(ref_text[1]), _num(ref_text[2])]
+                kid(c, "layer")[1] = Q("F.SilkS")
+                kid(kid(kid(c, "effects"), "font"), "thickness")[1] = "0.16"
+            else:
+                kid(c, "layer")[1] = Q("F.Fab")
         elif c[0] == "property" and c[1] == "Value":
             c[2] = Q(value)
+            if not kid(c, "hide"):
+                c.insert(-1, ["hide", "yes"])  # 値は図面(README/BOM)で確認できるので基板上では隠す
         elif c[0] == "attr" and dnp:
             c.append("dnp")
         elif c[0] in ("fp_line", "fp_rect", "fp_circle", "fp_arc", "fp_poly", "fp_curve", "fp_text", "pad"):
             n += 1
+            if c[0] == "fp_text" and c[1] == "user" and "${REFERENCE}" in str(c[2]) and not kid(c, "hide"):
+                c.insert(-1, ["hide", "yes"])  # Fab 層の部品番号の重複表示(基板上の番号と重なる)を隠す
             lay = kid(c, "layer")
             if lay and "SilkS" in str(lay[1]) and kid(c, "stroke"):  # 製造業者の最小線幅(0.15mm)に合わせて太くする
                 w = kid(kid(c, "stroke"), "width")

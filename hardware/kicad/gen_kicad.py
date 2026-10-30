@@ -26,63 +26,52 @@ def U(name: str) -> str:
 ROOT_UUID = U("root-sheet")
 
 # ---------------------------------------------------------------- 部品定義
-NETS = ["", "GND", "+3V3", "/CARRIER", "/LEVEL", "/NA", "/NB", "/DRV", "/ANT", "/LED_A", "/I2C_SDA", "/I2C_SCL", "/VBAT", "/CSW", "/RLY_A", "/FSEL"]
+NETS = ["", "GND", "+3V3", "/CARRIER", "/LEVEL", "/NA", "/NB", "/DRV", "/ANT_B", "/ANT_X", "/EXT_IN", "/CSW", "/RLY_A", "/FSEL", "/LED_A", "/I2C_SDA", "/I2C_SCL", "/VBAT", "/SIGLED", "/SIGLED_A", "/PWR_A"]
 NID = {n: i for i, n in enumerate(NETS)}
 SCH_NAME = {n: n.lstrip("/") for n in NETS}  # 回路図上のラベル名
 
 GND_PINS = (6, 9, 14, 20, 25, 30, 34, 39)
 J1_NET = {p: "GND" for p in GND_PINS}
-J1_NET.update({1: "+3V3", 3: "/I2C_SDA", 5: "/I2C_SCL", 37: "/FSEL", 12: "/CARRIER", 16: "/LEVEL", 17: "+3V3"})
+J1_NET.update({1: "+3V3", 3: "/I2C_SDA", 5: "/I2C_SCL", 18: "/SIGLED", 40: "/FSEL", 12: "/CARRIER", 16: "/LEVEL", 17: "+3V3"})
 J1_NC = [p for p in range(1, 41) if p not in J1_NET]
 
 U1_NET = {1: "GND", 2: "/CARRIER", 3: "/NA", 4: "/LEVEL", 5: "/CARRIER", 6: "/NB", 7: "GND",
           8: "", 9: "GND", 10: "+3V3", 11: "", 12: "GND", 13: "+3V3", 14: "+3V3"}
 
 R0603 = "Resistor_SMD:R_0603_1608Metric"
+CTHT = "Capacitor_THT:C_Rect_L7.0mm_W2.0mm_P5.00mm"  # リード付き積層セラミック(足の間隔 5.08mm 品で可)
+RTHT = "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P2.54mm_Vertical"  # 1/4W リード抵抗(縦置き)
 C0603 = "Capacitor_SMD:C_0603_1608Metric"
 LED0603 = "LED_SMD:LED_0603_1608Metric"
+LEDTHT = "LED_THT:LED_D3.0mm"  # 3mm リード LED
 SOIC14 = "Package_SO:SOIC-14_3.9x8.7mm_P1.27mm"
 HDR40 = "Connector_PinHeader_2.54mm:PinHeader_2x20_P2.54mm_Vertical"
 HDR2 = "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+HDR3 = "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
 SO4 = "Package_SO:SO-4_4.4x4.3mm_P2.54mm"
 SOIC16W = "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
 BATT = "Battery:BatteryHolder_MYOUNG_BS-07-A1BJ001_CR2032"
 MH = "MountingHole:MountingHole_2.7mm_M2.5"
+SOCK4 = "Connector_PinSocket_2.54mm:PinSocket_1x04_P2.54mm_Vertical"
 
 # ref, value, sch lib, footprint, sch (x,y), pcb (x,y,angle), {pin: net}
 PARTS = [
-    ("J1", "GPIO 2x20 stacking header", "Connector_Generic:Conn_02x20_Odd_Even", HDR40, (63.5, 152.4), (8.37, 4.77, 90), J1_NET),
+    ("J1", "GPIO 2x20 pin header (ribbon / Dupont)", "Connector_Generic:Conn_02x20_Odd_Even", HDR40, (63.5, 152.4), (8.37, 4.77, 90), J1_NET),
     ("U1", "74LVC125", "JJY:74LVC125", SOIC14, (203.2, 127), (40, 24, 0), U1_NET),
-    ("R1", "1k", "Device:R", R0603, (127, 76.2), (32, 22.73, 0), {1: "/DRV", 2: "/NA"}),
-    ("R2", "100", "Device:R", R0603, (152.4, 76.2), (32, 26.54, 0), {1: "/DRV", 2: "/NB"}),
-    ("R3", "10k", "Device:R", R0603, (254, 76.2), (31.5, 7.4, 0), {1: "+3V3", 2: "/LEVEL"}),
-    ("R4", "10k", "Device:R", R0603, (279.4, 76.2), (19.5, 8.5, 0), {1: "GND", 2: "/CARRIER"}),
-    ("R5", "1k", "Device:R", R0603, (304.8, 76.2), (37.5, 7.4, 0), {1: "+3V3", 2: "/LED_A"}),
-    ("D1", "LED red", "Device:LED", LED0603, (330.2, 76.2), (41.0, 7.4, 180), {1: "/LEVEL", 2: "/LED_A"}),
-    ("C1", "100n", "Device:C", C0603, (254, 127), (48.5, 22, 0), {1: "+3V3", 2: "GND"}),
-    ("C2", "4.7n C0G", "Device:C", C0603, (127, 177.8), (30, 33, 0), {1: "/DRV", 2: "/ANT"}),
-    ("C3", "2.2n C0G", "Device:C", C0603, (152.4, 177.8), (30, 36, 0), {1: "/DRV", 2: "/ANT"}),
-    ("C4", "150p C0G", "Device:C", C0603, (177.8, 177.8), (30, 39, 0), {1: "/DRV", 2: "/ANT"}),
-    ("C5", "trim (DNP)", "Device:C", C0603, (203.2, 177.8), (30, 42, 0), {1: "/DRV", 2: "/ANT"}),
-    ("J2", "Antenna", "Connector_Generic:Conn_01x02", HDR2, (254, 177.8), (50, 38, 0), {1: "/ANT", 2: "GND"}),
+    ("R1", "10k", "Device:R", RTHT, (127, 76.2), (31.175, 22.73, 0), {1: "/DRV", 2: "/NA"}),
+    ("R2", "1.1k", "Device:R", RTHT, (152.4, 76.2), (31.175, 26.54, 0), {1: "/DRV", 2: "/NB"}),
+    ("R3", "10k", "Device:R", RTHT, (254, 76.2), (48.0, 12.5, 0), {1: "+3V3", 2: "/LEVEL"}),
+    ("R4", "10k", "Device:R", RTHT, (279.4, 76.2), (18.675, 8.5, 0), {1: "GND", 2: "/CARRIER"}),
+    ("C1", "100n", "Device:C", CTHT, (254, 127), (46, 22, 0), {1: "+3V3", 2: "GND"}),
     # RTC: DS3231SN + 電池ホルダ(CR2032, 手はんだ)。SDA/SCL は Pi 側の 1.8k プルアップを使う。
     ("U2", "DS3231SN#", "JJY:DS3231SN", SOIC16W, (330.2, 127), (20, 22, 180),
      {2: "+3V3", 13: "GND", 14: "/VBAT", 15: "/I2C_SDA", 16: "/I2C_SCL"}),
-    ("C6", "100n", "Device:C", C0603, (355.6, 127), (26.4, 29.6, 90), {1: "GND", 2: "+3V3"}),
-    # 40/60kHz 切替: GPIO26=High でフォトモスリレー K1 が C7〜C9 (9.1nF) を共振回路に追加 -> 40kHz
-    ("C7", "4.7n C0G", "Device:C", C0603, (127, 228.6), (30, 45, 0), {1: "/CSW", 2: "/ANT"}),
-    ("C8", "2.2n C0G", "Device:C", C0603, (152.4, 228.6), (30, 47.5, 0), {1: "/CSW", 2: "/ANT"}),
-    ("C9", "2.2n C0G", "Device:C", C0603, (177.8, 228.6), (30, 50, 0), {1: "/CSW", 2: "/ANT"}),
-    ("K1", "AQY212SX", "JJY:AQY212S", SO4, (203.2, 228.6), (38, 50.9, 180), {1: "/RLY_A", 2: "GND", 3: "/DRV", 4: "/CSW"}),
-    ("R6", "330", "Device:R", R0603, (254, 228.6), (47, 52.17, 0), {1: "/RLY_A", 2: "/FSEL"}),
+    ("C6", "100n", "Device:C", CTHT, (355.6, 127), (26.4, 33.775, 90), {1: "GND", 2: "+3V3"}),
     ("BT1", "CR2032 holder", "Device:Battery_Cell", BATT, (381, 127), (16, 30.9, 270), {1: "/VBAT", 2: "GND"}),
-    # 取り付け穴(HAT 規格: 65x56mm の四隅から 3.5mm)
-    ("H1", "MountingHole", "Mechanical:MountingHole", MH, (330.2, 254), (3.5, 3.5, 0), {}),
-    ("H2", "MountingHole", "Mechanical:MountingHole", MH, (342.9, 254), (61.5, 3.5, 0), {}),
-    ("H3", "MountingHole", "Mechanical:MountingHole", MH, (355.6, 254), (3.5, 52.5, 0), {}),
-    ("H4", "MountingHole", "Mechanical:MountingHole", MH, (368.3, 254), (61.5, 52.5, 0), {}),
 ]
-BOARD_W, BOARD_H = 65.0, 56.0
+COIL_CX, COIL_CY, COIL_R, COIL_P, COIL_RIN = 82.0, 72.0, 13.0, 0.6, 4.0  # コイルの中心・外側半幅・ピッチ・内側半幅
+X_OFF, Y_OFF = 17.5, 3.73  # J1 を基板の上辺中央へ置くための、元のレイアウトの平行移動量
+BOARD_W, BOARD_H = 100.0, 96.0
 
 # ---------------------------------------------------------------- PCB 配線
 W_SIG, W_PWR = 0.25, 0.3
@@ -98,35 +87,21 @@ TRACKS = []
 TRACKS += poly("/CARRIER", "F.Cu", W_SIG, (21.07, 2.23), (22.34, 2.23), (22.34, 11), (35, 11), (35, 21.46), (37.525, 21.46))
 TRACKS += poly("/CARRIER", "F.Cu", W_SIG, (37.525, 25.27), (36.8, 25.27))
 TRACKS += poly("/CARRIER", "B.Cu", W_SIG, (36.8, 21.46), (36.8, 25.27))
-TRACKS += poly("/CARRIER", "F.Cu", W_SIG, (20.325, 8.5), (22.34, 8.5))              # R4 pad2
+TRACKS += poly("/CARRIER", "F.Cu", W_SIG, (21.215, 8.5), (22.34, 8.5))              # R4 pad2
 # LEVEL: GPIO23 -> B.Cu 幹線 -> U1 pin4 / R3 / D1
-TRACKS += poly("/LEVEL", "B.Cu", W_SIG, (26.15, 2.23), (27.42, 2.23), (27.42, 24), (34, 24))
-TRACKS += poly("/LEVEL", "F.Cu", W_SIG, (34, 24), (37.525, 24))
-TRACKS += poly("/LEVEL", "B.Cu", W_SIG, (27.42, 7.4), (43.2, 7.4))
-TRACKS += poly("/LEVEL", "F.Cu", W_SIG, (32.325, 7.4), (33.6, 7.4))                 # R3 pad2 -> via
-TRACKS += poly("/LEVEL", "F.Cu", W_SIG, (41.825, 7.4), (43.2, 7.4))                 # D1 pad1 -> via
+TRACKS += poly("/LEVEL", "B.Cu", W_SIG, (26.15, 2.23), (27.42, 2.23), (27.42, 24), (35.4, 24))
+TRACKS += poly("/LEVEL", "F.Cu", W_SIG, (35.4, 24), (37.525, 24))
+# LEVEL: B.Cu の幹線を R3 pad2 へ(リード部品のパッドは両面に銅箔があるのでビア不要)、D1 カソードへは F.Cu
+TRACKS += poly("/LEVEL", "B.Cu", W_SIG, (27.42, 7.4), (50.54, 7.4), (50.54, 12.5))
 # +3V3
 TRACKS += poly("+3V3", "F.Cu", W_PWR, (28.69, 4.77), (28.69, 9), (46, 9), (46, 25.27))
-TRACKS += poly("+3V3", "F.Cu", W_PWR, (30.675, 7.4), (28.69, 7.4))                  # R3 pad1
-TRACKS += poly("+3V3", "F.Cu", W_PWR, (36.675, 7.4), (36.675, 9))                   # R5 pad1
+TRACKS += poly("+3V3", "F.Cu", W_PWR, (46, 12.5), (48.0, 12.5))                     # R3 pad1
 TRACKS += poly("+3V3", "F.Cu", W_PWR, (42.475, 20.19), (46, 20.19))                 # U1 pin14
 TRACKS += poly("+3V3", "F.Cu", W_PWR, (42.475, 21.46), (46, 21.46))                 # U1 pin13
 TRACKS += poly("+3V3", "F.Cu", W_PWR, (42.475, 25.27), (46, 25.27))                 # U1 pin10
-TRACKS += poly("+3V3", "F.Cu", W_PWR, (46, 22), (47.675, 22))                       # C1 pad1
 # NA / NB / LED_A
-TRACKS += poly("/NA", "F.Cu", W_SIG, (37.525, 22.73), (32.825, 22.73))
-TRACKS += poly("/NB", "F.Cu", W_SIG, (37.525, 26.54), (32.825, 26.54))
-TRACKS += poly("/LED_A", "F.Cu", W_SIG, (38.325, 7.4), (40.175, 7.4))
-# DRV: R1/R2 -> C2..C5
-TRACKS += poly("/DRV", "F.Cu", W_SIG, (31.175, 22.73), (30.2, 22.73), (30.2, 31), (28.5, 31), (28.5, 42))
-TRACKS += poly("/DRV", "F.Cu", W_SIG, (31.175, 26.54), (30.2, 26.54))
-for y in (33, 36, 39, 42):
-    TRACKS += poly("/DRV", "F.Cu", W_SIG, (28.5, y), (29.175, y))
-# ANT: C2..C5 -> J2.1
-for y in (33, 36, 39, 42):
-    TRACKS += poly("/ANT", "F.Cu", W_SIG, (30.825, y), (32.5, y))
-TRACKS += poly("/ANT", "F.Cu", W_SIG, (32.5, 33), (32.5, 50))
-TRACKS += poly("/ANT", "F.Cu", W_SIG, (32.5, 36), (50, 36), (50, 38))
+TRACKS += poly("/NA", "F.Cu", W_SIG, (37.525, 22.73), (33.715, 22.73))
+TRACKS += poly("/NB", "F.Cu", W_SIG, (37.525, 26.54), (33.715, 26.54))
 # RTC (U2): I2C は F.Cu。SCL は SDA の配線をまたぐため B.Cu へ一度くぐる。3.3V は B.Cu で CARRIER の下をくぐる。
 TRACKS += poly("/I2C_SDA", "F.Cu", W_SIG, (10.91, 4.77), (10.91, 25.175), (15.35, 25.175))
 TRACKS += poly("/I2C_SCL", "F.Cu", W_SIG, (13.45, 4.77), (13.45, 24.0))
@@ -138,33 +113,171 @@ TRACKS += poly("+3V3", "B.Cu", W_PWR, (24, 10.5), (26.4, 10.5), (26.4, 25.175)) 
 TRACKS += poly("+3V3", "F.Cu", W_PWR, (24.65, 25.175), (26.4, 25.175), (26.4, 28.775))  # U2 pin2 -> C6
 TRACKS += poly("/VBAT", "F.Cu", W_SIG, (15.35, 23.905), (17.4, 23.905), (17.4, 27.5), (16, 27.5), (16, 30.9))
 TRACKS += poly("GND", "F.Cu", W_SIG, (15.35, 22.635), (17.4, 22.635))       # U2 pin13 -> via
-TRACKS += poly("GND", "F.Cu", W_SIG, (26.4, 30.425), (26.4, 32.0))          # C6 -> via
-# 40kHz 切替バンク: DRV -[K1]- CSW -[C7..C9]- ANT。K1 の LED は GPIO26 -> R6 -> K1.1
-for y in (45, 47.5, 50):
-    TRACKS += poly("/ANT", "F.Cu", W_SIG, (30.825, y), (32.5, y))
-    TRACKS += poly("/CSW", "F.Cu", W_SIG, (29.175, y), (28.5, y))
-TRACKS += poly("/CSW", "F.Cu", W_SIG, (28.5, 45), (28.5, 52.17), (35, 52.17))
-TRACKS += poly("/DRV", "F.Cu", W_SIG, (28.5, 42), (28.5, 43.3))
-TRACKS += poly("/DRV", "B.Cu", W_SIG, (28.5, 43.3), (33.5, 43.3), (33.5, 49.63))
-TRACKS += poly("/DRV", "F.Cu", W_SIG, (33.5, 49.63), (35, 49.63))
-TRACKS += poly("/RLY_A", "F.Cu", W_SIG, (41, 52.17), (46.175, 52.17))
-TRACKS += poly("/FSEL", "F.Cu", W_SIG, (47.825, 52.17), (54.09, 52.17), (54.09, 4.77))
-TRACKS += poly("GND", "F.Cu", W_SIG, (41, 49.63), (42.6, 49.63))
 # GND ビア(スタブ + B.Cu のベタへ)
 TRACKS += poly("GND", "F.Cu", W_SIG, (37.525, 20.19), (36.4, 20.19))
 TRACKS += poly("GND", "F.Cu", W_SIG, (37.525, 27.81), (36.4, 27.81))
 TRACKS += poly("GND", "F.Cu", W_SIG, (42.475, 22.73), (44.2, 22.73))
 TRACKS += poly("GND", "F.Cu", W_SIG, (42.475, 26.54), (44.2, 26.54))
-TRACKS += poly("GND", "F.Cu", W_SIG, (49.325, 22), (50.8, 22))
 TRACKS += poly("GND", "F.Cu", W_SIG, (18.675, 8.5), (17.2, 8.5))
 
 VIAS = [("/CARRIER", 36.8, 21.46), ("/CARRIER", 36.8, 25.27),
-        ("/LEVEL", 34, 24), ("/LEVEL", 33.6, 7.4), ("/LEVEL", 43.2, 7.4),
+        ("/LEVEL", 35.4, 24),
         ("GND", 36.4, 20.19), ("GND", 36.4, 27.81), ("GND", 44.2, 22.73), ("GND", 44.2, 26.54),
-        ("GND", 50.8, 22), ("GND", 17.2, 8.5), ("+3V3", 24, 9),
+        ("GND", 17.2, 8.5), ("+3V3", 24, 9),
         ("/I2C_SCL", 13.45, 24.0), ("/I2C_SCL", 13.45, 26.445), ("+3V3", 26.4, 25.175),
-        ("GND", 17.4, 22.635), ("GND", 26.4, 32.0),
-        ("/DRV", 28.5, 43.3), ("/DRV", 33.5, 49.63), ("GND", 42.6, 49.63)]
+        ("GND", 17.4, 22.635)]
+
+
+# ---- J1 を基板の上辺中央へ: 元の部品・配線を (X_OFF, Y_OFF) だけ平行移動する(J1 との相対位置は変えない)
+def _sx(x):
+    return round(x + X_OFF, 4)
+
+
+def _sy(y):
+    return round(y + Y_OFF, 4)
+
+
+PARTS = [(r, v, sl, fp, sp, (_sx(px), _sy(py), ang), nets) for r, v, sl, fp, sp, (px, py, ang), nets in PARTS]
+TRACKS = [(n, l, w, (_sx(a[0]), _sy(a[1])), (_sx(b[0]), _sy(b[1]))) for n, l, w, a, b in TRACKS]
+VIAS = [(n, _sx(x), _sy(y)) for n, x, y in VIAS]
+
+# ---- 最終座標で置くもの: LCD(AE-AQM1602A: +V SCL SDA GND の 1x4)、送信信号 LED、コイル、取り付け穴
+PARTS += [
+    # J3: 左下。向きを 180 度回して、上から GND / SDA / SCL / +V の順にし、I2C の配線が交差しないようにする
+    ("J3", "I2C LCD (AE-AQM1602A)", "Connector_Generic:Conn_01x04", SOCK4, (304.8, 177.8), (3.0, 73.62, 180),
+     {1: "+3V3", 2: "/I2C_SCL", 3: "/I2C_SDA", 4: "GND"}),
+    ("R7", "330", "Device:R", RTHT, (279.4, 228.6), (12.0, 18.77, 0), {1: "/SIGLED_A", 2: "/SIGLED"}),
+    ("D2", "LED green", "Device:LED", LEDTHT, (330.2, 228.6), (6.0, 16.23, 270), {1: "GND", 2: "/SIGLED_A"}),
+    ("R5", "1k", "Device:R", RTHT, (304.8, 76.2), (14.54, 31.04, 180), {1: "+3V3", 2: "/LED_A"}),
+    ("D1", "LED red", "Device:LED", LEDTHT, (330.2, 76.2), (6.0, 28.5, 270), {1: "/LEVEL", 2: "/LED_A"}),
+    # 通電表示(パイロットランプ): 3V3 -> R8 -> D3 -> GND。常時点灯
+    ("R8", "470", "Device:R", RTHT, (304.8, 228.6), (12.0, 42.54, 0), {1: "/PWR_A", 2: "+3V3"}),
+    ("D3", "LED yellow", "Device:LED", LEDTHT, (355.6, 228.6), (6.0, 40.0, 270), {1: "GND", 2: "/PWR_A"}),
+    ("H1", "MountingHole", "Mechanical:MountingHole", MH, (330.2, 254), (3.5, 3.5, 0), {}),
+    ("H2", "MountingHole", "Mechanical:MountingHole", MH, (342.9, 254), (96.5, 3.5, 0), {}),
+    ("H3", "MountingHole", "Mechanical:MountingHole", MH, (355.6, 254), (3.5, 92.5, 0), {}),
+    ("H4", "MountingHole", "Mechanical:MountingHole", MH, (368.3, 254), (96.5, 92.5, 0), {}),
+    # アンテナ選択: JP1 の 1-2 短絡 = 外付け(J2)/ 2-3 短絡 = 基板コイル(L1)。選ばれない側は開放になる
+    ("JP1", "Antenna select", "Connector_Generic:Conn_01x03", HDR3, (355.6, 177.8), (55.0, 56.46, 0),
+     {1: "/EXT_IN", 2: "/DRV", 3: "/ANT_B"}),
+    # 外付けアンテナ側の「共振オプション」(通常は未実装)。JP2 の短絡ピンを付ければ共振回路をバイパスする。
+    ("JP2", "Resonance bypass", "Connector_Generic:Conn_01x02", HDR2, (381, 177.8), (98.0, 16.0, 0),
+     {1: "/EXT_IN", 2: "/ANT_X"}),
+    ("J2", "External antenna", "Connector_Generic:Conn_01x02", HDR2, (330.2, 177.8), (98.0, 28.0, 0),
+     {1: "/ANT_X", 2: "GND"}),
+    ("C2", "4.7n C0G (DNP)", "Device:C", CTHT, (127, 177.8), (79.0, 16.0, 270), {1: "/EXT_IN", 2: "/ANT_X"}),
+    ("C3", "2.2n C0G (DNP)", "Device:C", CTHT, (152.4, 177.8), (84.0, 16.0, 270), {1: "/EXT_IN", 2: "/ANT_X"}),
+    ("C4", "150p C0G (DNP)", "Device:C", CTHT, (177.8, 177.8), (89.0, 16.0, 270), {1: "/EXT_IN", 2: "/ANT_X"}),
+    ("C5", "trim (DNP)", "Device:C", CTHT, (203.2, 177.8), (94.0, 16.0, 270), {1: "/EXT_IN", 2: "/ANT_X"}),
+    ("C7", "4.7n C0G (DNP)", "Device:C", CTHT, (127, 228.6), (79.0, 30.2, 90), {1: "/CSW", 2: "/ANT_X"}),
+    ("C8", "2.2n C0G (DNP)", "Device:C", CTHT, (152.4, 228.6), (84.0, 30.2, 90), {1: "/CSW", 2: "/ANT_X"}),
+    ("C9", "2.2n C0G (DNP)", "Device:C", CTHT, (177.8, 228.6), (89.0, 30.2, 90), {1: "/CSW", 2: "/ANT_X"}),
+    ("K1", "AQY212SX (DNP)", "JJY:AQY212S", SO4, (203.2, 228.6), (86.0, 38.0, 180),
+     {1: "/RLY_A", 2: "GND", 3: "/CSW", 4: "/EXT_IN"}),
+    ("R6", "330 (DNP)", "Device:R", RTHT, (254, 228.6), (92.0, 39.27, 0), {1: "/RLY_A", 2: "/FSEL"}),
+    # アンテナ: 基板上のスパイラルコイル(両面、中心で直列)。pad1=DRV 側 / pad2=GND 側 / pad3=中心の層間接続
+    ("L1", "PCB spiral coil", "Device:L", "JJY:Coil_Spiral", (279.4, 177.8), (COIL_CX, COIL_CY, 0), {1: "/ANT_B", 2: "GND"}),
+]
+# DRV: R1/R2(パッド1)-> x=47.7 を南へ -> コイル pad1(左上)へ東へ
+TRACKS += poly("/DRV", "F.Cu", W_SIG, (48.675, 26.46), (47.7, 26.46), (47.7, 59.0), (55.0, 59.0))
+TRACKS += poly("/ANT_B", "F.Cu", W_SIG, (55.0, 61.54), (62.0, 61.54), (62.0, COIL_CY - COIL_R),
+               (COIL_CX - COIL_R - 2, COIL_CY - COIL_R))
+# 外付け側: JP1.1(EXT_IN)-> 右側の領域へ。共振バンクは EXT_IN と ANT_X の間(C2..C5 は並列、C7..C9 は K1 経由)
+TRACKS += poly("/EXT_IN", "F.Cu", W_SIG, (55.0, 56.46), (55.0, 48.0), (75.0, 48.0), (75.0, 16.0), (98.0, 16.0))
+TRACKS += poly("/EXT_IN", "F.Cu", W_SIG, (75.0, 39.27), (83.0, 39.27))
+TRACKS += poly("/CSW", "F.Cu", W_SIG, (83.0, 36.73), (77.8, 36.73), (77.8, 30.2), (89.0, 30.2))
+TRACKS += poly("/ANT_X", "F.Cu", W_SIG, (79.0, 21.0), (98.0, 21.0))
+TRACKS += poly("/ANT_X", "F.Cu", W_SIG, (98.0, 18.54), (98.0, 28.0))
+TRACKS += poly("/ANT_X", "F.Cu", W_SIG, (81.5, 21.0), (81.5, 25.2))
+TRACKS += poly("/ANT_X", "F.Cu", W_SIG, (79.0, 25.2), (89.0, 25.2))
+TRACKS += poly("/RLY_A", "F.Cu", W_SIG, (89.0, 39.27), (92.0, 39.27))
+TRACKS += poly("GND", "F.Cu", W_SIG, (89.0, 36.73), (90.6, 36.73))
+TRACKS += poly("/FSEL", "B.Cu", W_SIG, (74.13, 5.96), (77.0, 5.96), (77.0, 43.0), (94.54, 43.0), (94.54, 39.27))
+TRACKS += poly("/DRV", "F.Cu", W_SIG, (48.675, 30.27), (47.7, 30.27))
+# I2C: U2 へ向かう既存の配線(SDA は x=28.41、SCL は x=30.95)を、そのまま南の J3 まで延ばす
+TRACKS += poly("/I2C_SDA", "F.Cu", W_SIG, (28.41, 28.905), (28.41, 68.54), (3.0, 68.54))
+TRACKS += poly("/I2C_SCL", "F.Cu", W_SIG, (30.95, 30.175), (30.95, 71.08), (3.0, 71.08))
+# 3V3: J1 ピン1 の裏面(B.Cu)の配線を南へ延ばして J3 の +V へ
+TRACKS += poly("+3V3", "B.Cu", W_PWR, (25.87, 14.23), (25.87, 73.62), (3.0, 73.62))
+VIAS += [("GND", 90.6, 36.73)]
+# 送信信号 LED: J1 ピン18(GPIO24)から上辺の外側を西へ、R7 -> D2
+TRACKS += poly("/SIGLED", "F.Cu", W_SIG, (46.19, 5.96), (46.19, 3.0), (14.54, 3.0), (14.54, 18.77))
+TRACKS += poly("/SIGLED_A", "F.Cu", W_SIG, (6.0, 18.77), (12.0, 18.77))
+# レベル LED(D1)を D2 の下へ: LEVEL は J1 ピン16 から上辺の外側を B.Cu で西へ、+3V3 は B.Cu で J1 ピン1 の配線へ
+TRACKS += poly("/LEVEL", "B.Cu", W_SIG, (43.65, 5.96), (43.65, 4.0), (10.0, 4.0), (10.0, 28.5), (6.0, 28.5))
+TRACKS += poly("/LED_A", "F.Cu", W_SIG, (6.0, 31.04), (12.0, 31.04))
+TRACKS += poly("+3V3", "B.Cu", W_PWR, (14.54, 31.04), (22.0, 31.04), (22.0, 14.23), (25.87, 14.23))
+# 通電 LED(D3): R8 の 3V3 側は R5 の 3V3 パッドへ B.Cu でつなぐ
+TRACKS += poly("/PWR_A", "F.Cu", W_SIG, (6.0, 42.54), (12.0, 42.54))
+TRACKS += poly("+3V3", "B.Cu", W_PWR, (14.54, 42.54), (14.54, 31.04))
+
+
+# ---------------------------------------------------------------- コイル(基板上のスパイラルアンテナ)
+def spiral_points():
+    """外側から内側へ時計回りの四角スパイラルの頂点列(コイル中心が原点)。"""
+    R, p, rin = COIL_R, COIL_P, COIL_RIN
+    x0, y0, x1, y1 = -R, -R, R, R
+    pts = [(x0, y0)]
+    while x1 - x0 >= 2 * rin:
+        pts += [(x1, y0), (x1, y1), (x0, y1)]
+        y0 += p
+        pts.append((x0, y0))
+        x0 += p
+        x1 -= p
+        y1 -= p
+    return [(round(x, 4), round(y, 4)) for x, y in pts]
+
+
+def coil_segments():
+    """(層, 始点, 終点) の列。F.Cu: pad1 -> 内側へ -> 中心 / B.Cu: 中心 -> 外側へ(左右反転して巻く向きを揃える) -> pad2。"""
+    R = COIL_R
+    top = spiral_points()
+    # 中心パッド(穴あき)に近づける終点: 穴(半径0.25)から離し、パッドのリング(半径0.8)の内側で止める
+    last = top[-1]
+    n = math.hypot(*last)
+    c_top = (round(last[0] / n * 0.7, 4), round(last[1] / n * 0.7, 4))
+    c_bot = (-c_top[0], c_top[1])
+    f = [(-R - 2, -R)] + top + [c_top]
+    bot_pts = [(-x, y) for x, y in reversed(top)]
+    b = [c_bot] + bot_pts + [(R + 3.3, -R)]
+    segs = [("F.Cu", f[i], f[i + 1]) for i in range(len(f) - 1)]
+    segs += [("B.Cu", b[i], b[i + 1]) for i in range(len(b) - 1)]
+    return segs
+
+
+def coil_length_mm():
+    return sum(math.dist(a, b) for _l, a, b in coil_segments())
+
+
+def coil_fp_text() -> str:
+    R = COIL_R
+    w = 0.25
+    L = ['(footprint "Coil_Spiral" (version 20241229) (generator "jjy") (layer "F.Cu")',
+         ' (descr "PCB spiral coil antenna (square, 2 layers in series, centre pad joins the layers)")',
+         ' (tags "coil antenna")',
+         f' (property "Reference" "REF**" (at 0 {-R - 6}) (layer "F.SilkS") (effects (font (size 1 1) (thickness 0.16))))',
+         f' (property "Value" "Coil_Spiral" (at 0 {R + 6}) (layer "F.Fab") (effects (font (size 1 1) (thickness 0.15))))',
+         ' (attr through_hole)',
+         ' (net_tie_pad_groups "1, 2, 3")']
+    for layer, a, b in coil_segments():
+        L.append(f' (fp_line (start {a[0]} {a[1]}) (end {b[0]} {b[1]}) (stroke (width {w}) (type solid)) (layer "{layer}"))')
+    m = R + 2.0
+    L.append(f' (fp_rect (start {-R - 3.6} {-m}) (end {m} {m}) (stroke (width 0.16) (type solid)) (fill no) (layer "F.SilkS"))')
+    L.append(f' (fp_rect (start {-R - 3.5} {-R - 3.2}) (end {R + 4.6} {R + 3.2}) (stroke (width 0.05) (type solid)) (fill no) (layer "F.CrtYd"))')
+    for num, x, y, d, dr in (("1", -R - 2, -R, 1.6, 0.8), ("2", R + 3.3, -R, 1.6, 0.8), ("3", 0, 0, 1.6, 0.5)):
+        L.append(f' (pad "{num}" thru_hole circle (at {x} {y}) (size {d} {d}) (drill {dr}) (layers "*.Cu" "*.Mask"))')
+    L.append(')')
+    return "\n".join(L) + "\n"
+
+
+def write_local_libs():
+    pretty = OUT / "JJY.pretty"
+    pretty.mkdir(exist_ok=True)
+    (pretty / "Coil_Spiral.kicad_mod").write_text(coil_fp_text(), encoding="utf-8")
+    (OUT / "fp-lib-table").write_text('(fp_lib_table\n  (version 7)\n'
+                                      '  (lib (name "JJY")(type "KiCad")(uri "${KIPRJMOD}/JJY.pretty")(options "")(descr "JJY HAT custom footprints"))\n)\n',
+                                      encoding="utf-8")
+    KL.LOCAL_FP["JJY"] = pretty
 
 
 # ---------------------------------------------------------------- 幾何
@@ -259,6 +372,9 @@ def build_items():
         items.append(dict(kind="seg", layers={layer}, net=net, a=a, b=b, r=w / 2, id=f"track {net} {a}->{b} {layer}"))
     for net, x, y in VIAS:
         items.append(dict(kind="seg", layers={"F.Cu", "B.Cu"}, net=net, a=(x, y), b=(x, y), r=VIA_D / 2, via=True, id=f"via {net} ({x},{y})"))
+    for layer, a, b in coil_segments():
+        items.append(dict(kind="seg", layers={layer}, net="", a=(COIL_CX + a[0], COIL_CY + a[1]), b=(COIL_CX + b[0], COIL_CY + b[1]),
+                          r=0.125, coil=True, id=f"coil {layer} {a}->{b}"))
     for ref, num, net, x, y, w, h, thru, circ in global_pads():
         layers = {"F.Cu", "B.Cu"} if thru else {"F.Cu"}
         if circ:
@@ -291,6 +407,10 @@ def check() -> list[str]:
         if i["net"] == j["net"] and i["net"] != "":
             continue
         if i.get("pad") and j.get("pad") and i["net"] == "" and j["net"] == "":
+            continue
+        if i.get("coil") and (j.get("coil") or str(j["id"]).startswith("pad L1.") or j["net"] == "/ANT_B"):
+            continue  # コイル同士・自分のパッド・pad1 に接続する DRV の配線との重なりは意図したもの
+        if j.get("coil") and (i.get("coil") or str(i["id"]).startswith("pad L1.") or i["net"] == "/ANT_B"):
             continue
         d = dist(i, j)
         if d < CLR - 1e-6:
@@ -345,6 +465,26 @@ def nc_name(ref, fpn, num, nets):
     return f"unconnected-({ref}-{pin.replace('/', '{slash}')}-Pad{num})"
 
 
+# 部品番号(シルク)の位置: 基板上の中心座標。文字は常に横書き。
+REF_G = {"J1": (5.3, 7.6), "U1": (40, 18.3), "U2": (20, 15.4), "R1": (32.45, 20.4), "R2": (32.45, 29.0),
+         "R3": (49.27, 10.1), "R4": (19.95, 11.3), "R6": (47.45, 54.3),
+         "C1": (48.5, 19.6), "C2": (33, 30.5), "C3": (38, 30.5), "C4": (43, 30.5), "C5": (48, 30.5), "C6": (23.6, 31.3),
+         "C7": (33, 39.9), "C8": (38, 39.9), "C9": (43, 39.9), "K1": (38, 54.6), "J2": (53, 35.3), "BT1": (16, 38.5)}
+REF_G = {k: (_sx(v[0]), _sy(v[1])) for k, v in REF_G.items()}
+REF_G.update({"J3": (7.0, 64.0), "R7": (13.27, 21.2), "D2": (6.0, 13.43), "D1": (6.0, 25.7), "R5": (13.27, 33.5), "D3": (6.0, 37.2), "R8": (13.27, 45.0), "L1": (COIL_CX, COIL_CY - COIL_R - 5.5), "JP1": (58.6, 56.4), "J2": (98.0, 25.9), "JP2": (98.0, 13.4),
+            "C2": (79, 13.9), "C3": (84, 13.9), "C4": (89, 13.9), "C5": (94, 13.9),
+            "C7": (79, 23.1), "C8": (84, 23.1), "C9": (89, 23.1), "K1": (86, 34.4), "R6": (93.27, 36.8)})
+REF_ANGLE_ABSOLUTE = True  # 基板ファイルの文字角度が「基板上の絶対角度」かどうか(描画で確認済みの設定)
+
+
+def ref_text(ref, at):
+    if ref not in REF_G:
+        return "hide"
+    px, py, ang = at
+    lx, ly = rot(REF_G[ref][0] - px, REF_G[ref][1] - py, -ang)
+    return (lx, ly, 0 if REF_ANGLE_ABSOLUTE else (-ang) % 360)
+
+
 def pcb_text() -> str:
     o = []
     A = o.append
@@ -368,21 +508,30 @@ def pcb_text() -> str:
     for ref, value, _s, fpn, _sp, at, nets in PARTS:
         A("  " + KL.embed_fp(fpn, ref, value, at, lambda tag, ref=ref: U(f"fp-{ref}-{tag}"),
                               lambda num, ref=ref, fpn=fpn, nets=nets: (lambda n: (NID[n], n) if n else None)(pad_net(ref, fpn, num, nets)),
-                              sch_uuid[ref], dnp="DNP" in value))
+                              sch_uuid[ref], dnp="DNP" in value, ref_text=ref_text(ref, at)))
     A(f'  (gr_rect (start 0 0) (end {BOARD_W} {BOARD_H}) (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts") (uuid "{U("edge")}"))')
-    for k, (txt, x, y) in enumerate([("JJY HAT 60/40kHz", 35, 42.8), ("GPIO18 CARRIER", 35, 44.4), ("GPIO23 LEVEL", 35, 46.0),
-                                     ("GPIO26 40k SEL", 35, 47.6), ("ANT", 50, 33.8), ("Rev B", 56, 12),
-                                     ("RTC DS3231 + CR2032", 3.2, 10.5)]):
-        A(f'  (gr_text "{txt}" (at {x} {y}) (layer "F.SilkS") (uuid "{U(f"txt{k}")}") (effects (font (size 1 1) (thickness 0.16)) (justify left)))')
+    old_texts = [("RTC DS3231 + CR2032", 3.0, 29, 90)]
+    new_texts = [("I2C LCD  1:+V 2:SCL 3:SDA 4:GND", 1.5, 76.6, 0), ("SIGNAL", 3.8, 22.5, 0), ("LEVEL", 3.8, 34.5, 0), ("POWER", 3.8, 46.0, 0),
+                 ("JJY 40/60kHz Rev C", 4.0, 94.0, 0), ("JP1 1-2: EXT (J2)", 43.5, 63.9, 0), ("JP1 2-3: BOARD COIL", 43.5, 65.5, 0),
+                 ("OPTION: RESONANCE (DNP)", 77.0, 10.6, 0), ("JP2 shunt = bypass", 77.0, 12.1, 0), ("ANT: PCB coil (keep metal away)", 62.0, 94.0, 0)]
+    for k, (txt, x, y, ang) in enumerate([(t, _sx(x), _sy(y), a) for t, x, y, a in old_texts] + new_texts):
+        A(f'  (gr_text "{txt}" (at {x} {y}{" " + str(ang) if ang else ""}) (layer "F.SilkS") (uuid "{U(f"txt{k}")}") (effects (font (size 1 1) (thickness 0.16)) (justify left)))')
     for k, (net, layer, w, a, b) in enumerate(TRACKS):
         A(f'  (segment (start {a[0]} {a[1]}) (end {b[0]} {b[1]}) (width {w}) (layer "{layer}") (net {NID[net]}) (uuid "{U(f"trk{k}")}"))')
     for k, (net, x, y) in enumerate(VIAS):
         A(f'  (via (at {x} {y}) (size {VIA_D}) (drill {VIA_DRILL}) (layers "F.Cu" "B.Cu") (net {NID[net]}) (uuid "{U(f"via{k}")}"))')
     for layer in ("F.Cu", "B.Cu"):
         A(f'  (zone (net {NID["GND"]}) (net_name "GND") (layer "{layer}") (uuid "{U("zone" + layer)}") (hatch edge 0.5)'
-          ' (connect_pads (clearance 0.3)) (min_thickness 0.25) (filled_areas_thickness no)'
+          ' (connect_pads yes (clearance 0.3)) (min_thickness 0.25) (filled_areas_thickness no)'
           ' (fill (thermal_gap 0.5) (thermal_bridge_width 0.5))'
           f' (polygon (pts (xy 0.5 0.5) (xy {BOARD_W - 0.5} 0.5) (xy {BOARD_W - 0.5} {BOARD_H - 0.5}) (xy 0.5 {BOARD_H - 0.5}))))')
+    k = 2.5
+    pts = " ".join(f"(xy {x} {y})" for x, y in ((COIL_CX - COIL_R - k, COIL_CY - COIL_R - k), (COIL_CX + COIL_R + k, COIL_CY - COIL_R - k),
+                                                (COIL_CX + COIL_R + k, COIL_CY + COIL_R + k), (COIL_CX - COIL_R - k, COIL_CY + COIL_R + k)))
+    A(f'  (zone (net 0) (net_name "") (layers "F.Cu" "B.Cu") (uuid "{U("coilkeepout")}") (name "coil keepout") (hatch edge 0.5)'
+      ' (connect_pads (clearance 0)) (min_thickness 0.25)'
+      ' (keepout (tracks allowed) (vias allowed) (pads allowed) (copperpour not_allowed) (footprints allowed))'
+      f' (fill (thermal_gap 0.5) (thermal_bridge_width 0.5)) (polygon (pts {pts})))')
     A(')')
     return "\n".join(o) + "\n"
 
@@ -516,7 +665,7 @@ def sch_text() -> str:
             label(SCH_NAME[net], end, outward)
 
     A(f'(kicad_sch (version 20231120) (generator "eeschema") (generator_version "8.0") (uuid "{ROOT_UUID}") (paper "A3")')
-    A(f'  (title_block (title "JJY HAT 40/60kHz for Raspberry Pi 4") (date "2026-10-29") (rev "B")'
+    A(f'  (title_block (title "JJY time unit 40/60kHz (cable to Raspberry Pi GPIO)") (date "2026-10-30") (rev "C")'
       ' (comment 1 "Raspberry Pi 4 GPIO18 (PWM0) = carrier, GPIO23 = level (low = full amplitude)"))')
     used = sorted({p[2] for p in PARTS} | set(POWER_LIBS))
     A("  (lib_symbols")
@@ -548,13 +697,12 @@ def sch_text() -> str:
     def note(text, x, y, size=2.0):
         A(f'  (text "{text}" (exclude_from_sim no) (at {x} {y} 0) {E(size=size, justify="left")} (uuid "{uid("t")}"))')
 
-    note("JJY HAT 40/60kHz (60kHz Hagane-yama default / 40kHz Ohtakadoya-yama), on-board RTC", 20, 25, 3.5)
+    note("JJY time unit 40/60kHz: connects to the Raspberry Pi 2x20 GPIO header with a ribbon or Dupont cable (J1, top centre).", 20, 25, 3.5)
     note("GPIO18 (PWM0) = 40k/60kHz carrier. GPIO23 = level: Low -> U1B enabled -> full amplitude / High -> 10% (-20dB).", 20, 35)
-    note("U1A (always on) drives via R1 1k, U1B adds R2 100R in parallel: (1k+Rcoil)/(91R+Rcoil) = ~10:1.", 20, 41)
-    note("Series resonance: L(1mH) with C2+C3+C4 (+C5 trim) = 7.05nF -> 59.9kHz; with C7+C8+C9 (+9.1nF) = 16.15nF -> 39.6kHz. Measure L and tune C.", 20, 47)
-    note("U2 DS3231SN + BT1 CR2032: on-board RTC (I2C pull-ups are on the Pi). Enable [rtc] in /etc/jjyd.toml.", 20, 59)
-    note("Band select: GPIO26 (FSEL). Low = 60kHz (default). High = K1 photo-MOS relay adds C7-C9 (9.1nF) -> 40kHz.", 20, 65)
-    note("Keep the radiated field within the micro-power station limit (500uV/m at 3m, below 322MHz).", 20, 53)
+    note("U1A (always on) drives via R1 10k, U1B adds R2 1.1k in parallel: ratio = 1+R1/R2 = ~10:1 (-20dB). Keep R1 = ~9 x R2. Antenna current ~2mA.", 20, 41)
+    note("L1 = on-board PCB spiral coil (2 layers, ~15uH, DC resistance ~4 ohm). Not resonant: the drive resistance is much larger than the coil reactance.", 20, 47)
+    note("U2 DS3231SN + BT1 CR2032: on-board RTC (I2C pull-ups are on the Pi). J3 = I2C 16x2 LCD. D2 = signal LED (GPIO24).", 20, 53)
+    note("Keep the radiated field within the micro-power station limit (500uV/m at 3m, below 322MHz).", 20, 59)
     A('  (sheet_instances (path "/" (page "1")))')
     A(')')
     return "\n".join(o) + "\n"
@@ -571,6 +719,7 @@ def pro_text() -> str:
 
 
 def main() -> int:
+    write_local_libs()
     snap_tracks()
     errs = check()
     if errs:
