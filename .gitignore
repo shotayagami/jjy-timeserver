@@ -13,3 +13,8 @@ drc.rpt
 DRC.rpt
 erc.rpt
 ERC.rpt
+
+# ローカルのツール設定・作業メモ(認証情報を含む可能性があるので公開しない)
+.codex/
+.mcp.json
+docs/
