@@ -201,7 +201,7 @@
     (pin "1" (uuid "be772a7f-348d-5fbf-a811-adca684d29c4"))
     (pin "2" (uuid "1e2beee0-ae9e-5357-ab34-01036c10ad02"))
     (instances (project "jjy-hat" (path "/40741956-28cf-5098-b1ad-9fedd8f61b8d" (reference "C9") (unit 1)))))
-  (symbol (lib_id "JJY:AQY212S") (at 203.2 228.6 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp yes) (uuid "0300f26c-8674-5002-a491-d4b2d58653a0") (property "Reference" "K1" (at 207.01 226.06 0) (effects (font (size 1.27 1.27)) (justify left))) (property "Value" "AQY212SX (DNP)" (at 207.01 228.6 0) (effects (font (size 1.27 1.27)) (justify left))) (property "Footprint" "Package_SO:SO-4_4.4x4.3mm_P2.54mm" (at 203.2 228.6 0) (effects (font (size 1.27 1.27)) hide)) (property "Datasheet" "~" (at 203.2 228.6 0) (effects (font (size 1.27 1.27)) hide))
+  (symbol (lib_id "JJY:AQY212S") (at 203.2 228.6 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "0300f26c-8674-5002-a491-d4b2d58653a0") (property "Reference" "K1" (at 207.01 226.06 0) (effects (font (size 1.27 1.27)) (justify left))) (property "Value" "AQY212SX" (at 207.01 228.6 0) (effects (font (size 1.27 1.27)) (justify left))) (property "Footprint" "Package_SO:SO-4_4.4x4.3mm_P2.54mm" (at 203.2 228.6 0) (effects (font (size 1.27 1.27)) hide)) (property "Datasheet" "~" (at 203.2 228.6 0) (effects (font (size 1.27 1.27)) hide))
     (pin "1" (uuid "f33e0722-0347-5973-9ade-a9441e8873b7"))
     (pin "2" (uuid "3daed60d-5539-54ee-bd0c-8473ce866f34"))
     (pin "3" (uuid "9af3416d-5459-5271-a944-ad8d7c763376"))

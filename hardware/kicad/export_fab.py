@@ -40,8 +40,8 @@ def main():
         run("pcb", "export", "pos", pcb, "-o", FAB / "jjy-hat-pos.csv", "--format", "csv", "--units", "mm",
             "--side", "front", "--exclude-dnp")
     run("sch", "export", "bom", HERE / "jjy-hat.kicad_sch", "-o", FAB / "jjy-hat-bom.csv", "--fields",
-        "Reference,Value,Footprint,${QUANTITY}", "--labels", "Designator,Value,Footprint,Qty",
-        "--group-by", "Value,Footprint", "--exclude-dnp")
+        "Reference,Value,Footprint,${QUANTITY},${DNP}", "--labels", "Designator,Value,Footprint,Qty,DNP",
+        "--group-by", "Value,Footprint")  # 未実装(DNP)の共振オプション部品も部品表に載せる
     with zipfile.ZipFile(FAB / "jjy-hat-gerber.zip", "w", zipfile.ZIP_DEFLATED) as z:
         for f in sorted(g.glob("*")):
             if "_map" not in f.name:
