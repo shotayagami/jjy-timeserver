@@ -7,10 +7,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from jjyd import main as M  # noqa: E402
-from jjyd.encoder import PULSE_WIDTH, callsign_keying  # noqa: E402
+from datetime import datetime  # noqa: E402
+
+from jjyd.encoder import JST, PULSE_WIDTH, callsign_keying, encode_minute  # noqa: E402
 from jjyd.status import StatusWriter  # noqa: E402
 from jjyd.timesync import SyncMonitor  # noqa: E402
-from jjymon import data, emulate  # noqa: E402
+from jjymon import data, emulate, frame as fr  # noqa: E402
 
 FRAME = "M" + "10" * 29 + "M"  # 60 シンボル。1 秒目 = '1'、2 秒目 = '0'
 
@@ -47,6 +49,36 @@ class EmulateTest(unittest.TestCase):
         off = emulate.at(frame, 60 * 1000 + 40 + a / 2, True)
         self.assertEqual((on.amplitude, on.d1, on.d2), (1.0, True, False))
         self.assertEqual((off.amplitude, off.d1, off.d2), (0.0, True, True))
+
+
+class FrameTest(unittest.TestCase):
+    def test_decode_matches_encoder(self):
+        for dt in (datetime(2026, 10, 31, 13, 49, tzinfo=JST), datetime(2000, 1, 1, 0, 0, tzinfo=JST),
+                   datetime(2099, 12, 31, 23, 59, tzinfo=JST), datetime(2024, 2, 29, 7, 8, tzinfo=JST)):
+            d = fr.decode("".join(encode_minute(dt)))
+            self.assertEqual((d["min"], d["hour"], d["doy"], d["year"]), (dt.minute, dt.hour, dt.timetuple().tm_yday, dt.year))
+            self.assertEqual(d["wday"], (dt.weekday() + 1) % 7)
+            self.assertTrue(d["pa1_ok"] and d["pa2_ok"])
+            self.assertEqual((d["su"], d["ls"]), ((0, 0), (0, 0)))
+
+    def test_leap_warning(self):
+        t = datetime(2026, 6, 30, 8, 0, tzinfo=JST)
+        self.assertEqual(fr.decode("".join(encode_minute(t, 1)))["ls"], (1, 1))
+        self.assertEqual(fr.decode("".join(encode_minute(t, -1)))["ls"], (1, 0))
+
+    def test_callsign_frame(self):
+        frame = "".join(encode_minute(datetime(2026, 10, 31, 13, 15, tzinfo=JST), callsign=True))
+        self.assertTrue(fr.is_callsign(frame))
+        d = fr.decode(frame)
+        self.assertEqual((d["min"], d["hour"], d["year"], d["wday"], d["ls"]), (15, 13, None, None, None))
+        lay = fr.layout(True)
+        self.assertEqual((lay[44][0], lay[50], lay[55]), ("call", ("st", "ST1"), ("st", "ST6")))
+
+    def test_layout_covers_every_second_and_weights_sum(self):
+        lay = fr.layout()
+        self.assertEqual(set(lay), set(range(61)))
+        self.assertEqual([lay[i][1] for i in range(1, 9)], ["40", "20", "10", "", "8", "4", "2", "1"])
+        self.assertEqual((lay[0], lay[59], lay[36], lay[53]), (("mk", "M"), ("mk", "P0"), ("par", "PA1"), ("ls", "LS1")))
 
 
 class DataTest(unittest.TestCase):

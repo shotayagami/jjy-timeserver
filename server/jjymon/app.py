@@ -12,7 +12,7 @@ import time
 import tkinter as tk
 import tkinter.font as tkfont
 
-from . import data, emulate
+from . import data, emulate, frame as fr
 
 W, H = 1920, 1080  # 設計上の画面。実際の大きさに合わせて拡縮する
 JST_S = 9 * 3600
@@ -148,33 +148,41 @@ class Monitor:
             self.label(cx, 368, sub, 20, DIM, "n")
         self.text("edge", 1010, 394, "", 20, DIM)
 
-        # フレーム全体
-        self.panel(30, 440, 720, 360, "フレーム(1 分 = 60 秒)")
-        self.text("minute", 740, 450, "", 22, TEXT, anchor="ne")
+        # フレーム全体と、各ビットの意味
+        self.panel(30, 440, 1130, 360, "フレーム(1 分 = 60 秒)   高レベル: M 0.2 秒 / 1 0.5 秒 / 0 0.8 秒")
+        self.text("minute", 1150, 450, "", 22, TEXT, anchor="ne")
         self.cells = []
         for i in range(61):
             x, y = 50 + (i % 10) * 68, 486 + (i // 10) * 44
             r = cv.create_rectangle(s(x), s(y), s(x + 62), s(y + 40), fill=CELL, outline=EDGE)
-            t = cv.create_text(s(x + 36), s(y + 21), text="", fill=DIM, font=self.font(24, True, True))
+            b = cv.create_rectangle(s(x + 1), s(y + 36), s(x + 61), s(y + 39), fill=EDGE, outline="")
+            t = cv.create_text(s(x + 22), s(y + 19), text="", fill=DIM, font=self.font(24, True, True))
             n = cv.create_text(s(x + 4), s(y + 2), text=str(i), anchor="nw", fill=DIM, font=self.font(12))
+            wl = cv.create_text(s(x + 59), s(y + 34), text="", anchor="se", fill=DIM, font=self.font(14, False, True))
             if i == 60:
-                cv.itemconfigure(r, state="hidden")
-                cv.itemconfigure(t, state="hidden")
-                cv.itemconfigure(n, state="hidden")
-            self.cells.append((r, t, n))
-        self.label(740, 778, "M 0.2 s   1 0.5 s   0 0.8 s(高レベルの長さ)", 18, DIM, "se")
+                for it in (r, b, t, n, wl):
+                    cv.itemconfigure(it, state="hidden")
+            self.cells.append((r, t, n, wl, b))
+        self.legend = []
+        for i, (key, name, secs) in enumerate(fr.ROWS):
+            y = 486 + i * 24
+            bg = cv.create_rectangle(s(750), s(y), s(1150), s(y + 23), fill=PANEL, outline="")
+            cv.create_rectangle(s(758), s(y + 5), s(768), s(y + 17), fill=fr.COLOR[key], outline="")
+            cv.create_text(s(776), s(y + 11), text=name, anchor="w", fill=TEXT, font=self.font(18))
+            self.text("lg_" + key, 1146, y + 1, "", 18, TEXT, anchor="ne", mono=True)
+            self.legend.append((key, bg))
 
         # 波形(直近 10 秒)
-        self.panel(780, 440, 1110, 360, f"信号波形(直近 {int(WAVE_S)} 秒。右端が現在)")
-        self.wx0, self.wx1 = 940, 1870
+        self.panel(1180, 440, 710, 360, f"信号波形(直近 {int(WAVE_S)} 秒。右端が現在)")
+        self.wx0, self.wx1 = 1340, 1870
         self.lanes = {"amp": (500, 590), "d1": (640, 680), "d2": (720, 760)}
         for name, (a, b) in self.lanes.items():
             cv.create_rectangle(s(self.wx0), s(a), s(self.wx1), s(b), fill=BG, outline=EDGE)
-        self.label(930, 505, "搬送波", 22, TEXT, "ne")
-        self.label(930, 535, "100%", 18, DIM, "ne")
-        self.label(930, 568, "10%", 18, DIM, "ne")
-        self.label(930, 650, "D1 赤", 22, "#ff7a7a", "ne")
-        self.label(930, 730, "D2 黄緑", 22, "#b6f060", "ne")
+        self.label(1330, 505, "搬送波", 22, TEXT, "ne")
+        self.label(1330, 535, "100%", 18, DIM, "ne")
+        self.label(1330, 568, "10%", 18, DIM, "ne")
+        self.label(1330, 650, "D1 赤", 22, "#ff7a7a", "ne")
+        self.label(1330, 730, "D2 黄緑", 22, "#b6f060", "ne")
         self.grid_lines = [(cv.create_line(0, 0, 0, 0, fill=EDGE), cv.create_text(0, 0, fill=DIM, font=self.font(16), anchor="n"))
                            for _ in range(int(WAVE_S) + 2)]
         for name, color in (("amp", "#6ad6ff"), ("d1", "#ff5c5c"), ("d2", "#9be83a")):
@@ -275,22 +283,55 @@ class Monitor:
         cv = self.cv
         self.set("minute", (st.get("minute") + " JST") if frame and st else "--", TEXT if frame else DIM)
         n = len(frame) if frame else 60
-        for i, (r, t, num) in enumerate(self.cells):
+        call = fr.is_callsign(frame)
+        lay = fr.layout(call)
+        cur_i = sig.idx if st_same is not None else None
+        for i, (r, t, num, wl, bar) in enumerate(self.cells):
             if i == 60:
                 st_ = "normal" if n > 60 else "hidden"
-                for it in (r, t, num):
+                for it in (r, t, num, wl, bar):
                     cv.itemconfigure(it, state=st_)
+            field, wlabel = lay[i]
             sym = frame[i] if frame and i < len(frame) else None
+            cv.itemconfigure(bar, fill=fr.COLOR[field] if frame else EDGE)
+            cv.itemconfigure(wl, text=wlabel, fill=fr.COLOR[field] if frame else DIM)
             if sym is None:
                 cv.itemconfigure(r, fill=CELL, outline=EDGE, width=1)
                 cv.itemconfigure(t, text="-", fill=EDGE)
                 continue
-            cur = st_same is not None and sig.idx == i
-            past = st_same is not None and sig.idx is not None and i < sig.idx
+            cur = cur_i == i
+            past = cur_i is not None and i < cur_i
             cv.itemconfigure(r, fill=SYM_COLOR[sym] if cur else SYM_DARK[sym] if past else CELL,
                              outline="#ffffff" if cur else EDGE, width=3 if cur else 1)
             cv.itemconfigure(t, text=sym, fill="#10161c" if cur else SYM_COLOR[sym] if not past else TEXT)
             cv.itemconfigure(num, fill="#10161c" if cur else DIM)
+            if cur:
+                cv.itemconfigure(wl, fill="#10161c")
+        self._update_legend(frame, call, lay, cur_i)
+
+    def _update_legend(self, frame, call, lay, cur_i) -> None:
+        """右の表: 項目ごとの意味と、今のフレームが表している値。今の秒が属する項目の行を強調する。"""
+        d = fr.decode(frame) if frame else {}
+        here = lay[cur_i][0] if cur_i in lay else None
+        ok = lambda b: "OK" if b else "NG"  # noqa: E731
+        ls = d.get("ls")
+        text = {
+            "min": f"{d['min']:02d} 分" if d else "--",
+            "hour": f"{d['hour']:02d} 時" if d else "--",
+            "doy": f"{d['doy']} 日目" if d else "--",
+            "year": ("送らない" if d["year"] is None else f"{d['year']} 年") if d else "--",
+            "wday": ("送らない" if d["wday"] is None else f"{'日月火水木金土'[d['wday']]}曜") if d else "--",
+            "par": f"PA1 {ok(d['pa1_ok'])} / PA2 {ok(d['pa2_ok'])}" if d else "--",
+            "su": ("なし" if not any(d["su"]) else "あり") if d else "--",
+            "ls": "--" if not d else "送らない" if ls is None else "なし" if not ls[0] else "挿入予告" if ls[1] else "削除予告",
+            "res": "0" if d else "--",
+            "mk": "7 か所" if d else "--",
+            "call": "JJY を送信中" if call else "なし",
+            "st": ("なし" if not any(d["st"]) else "あり") if call else "なし",
+        }
+        for key, bg in self.legend:
+            self.set("lg_" + key, text[key], TEXT if d and (key not in ("call", "st") or call) else DIM)
+            self.cv.itemconfigure(bg, fill=CELL if key == here else PANEL)
 
     def _update_wave(self, now: float, sig) -> None:
         h = self.history
