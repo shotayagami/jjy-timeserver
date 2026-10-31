@@ -33,6 +33,11 @@ if [ "${JJY_RTC:-1}" = "1" ]; then
     sed -i '/^\[rtc\]/,/^\[/ s/^enabled = false/enabled = true/' /etc/jjyd.toml 2>/dev/null || true
 else
     sed -i '/^\[rtc\]/,/^\[/ s/^enabled = true/enabled = false/' /etc/jjyd.toml 2>/dev/null || true
+    # RTC が無いと、起動時の時計は保存された時刻から始まる。systemd-timesyncd を止めると保存が止まるので、fake-hwclock で
+    # 1 時間ごとと停止時に保存して、起動直後のずれを縮める(chrony が同期するまでの間の時計)。RTC がある構成では不要。
+    apt-get install -y fake-hwclock
+    systemctl enable fake-hwclock 2>/dev/null || true
+    fake-hwclock save || true
 fi
 
 systemctl daemon-reload
