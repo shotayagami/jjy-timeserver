@@ -4,8 +4,10 @@ jjyd は秒ごとの送信が終わった後に状態を書く(送信のタイ�
 「その分のフレーム」と「今の時刻」から、送信中の信号を計算する。規則は jjyd.main の send_pulse / send_callsign_second と同じ。
 """
 from dataclasses import dataclass
+from datetime import datetime
 
-from jjyd.encoder import CALLSIGN_START, PULSE_WIDTH, callsign_keying
+from jjyd.encoder import CALLSIGN_START, JST, PULSE_WIDTH, callsign_keying
+from jjyd.lcd import format_lines
 
 _KEYING = callsign_keying()
 
@@ -50,3 +52,24 @@ def segments(sym: str | None, idx: int, carrier: bool) -> list[tuple[float, floa
     elif carrier and sym is not None:
         cuts.append(PULSE_WIDTH[sym])
     return [(c, *_state(sym, idx, c + 1e-9, carrier)) for c in cuts]
+
+
+def lcd_lines(frame: str | None, now: float, carrier: bool, khz: int) -> tuple[str, str]:
+    """基板の LCD(16x2)に今出ている 2 行。jjyd.main の Display.update と同じ規則で、同じ format_lines で作る。
+
+    送信中は、各秒の高レベルが終わった後(立ち下がり後)にその秒の時刻へ更新する。呼出符号の秒(40〜48 秒)は更新しない。
+    停止中は、各秒の頭で「OFF」の表示に更新する。
+    """
+    sec = int(now // 1)
+    if not carrier:
+        return format_lines(datetime.fromtimestamp(sec, JST), khz, "OFF")
+
+    def sym_of(s: int) -> str | None:
+        return frame[s % 60] if frame and s % 60 < len(frame) else ("M" if s % 60 == 0 else None)
+
+    u = sec if now - sec >= PULSE_WIDTH.get(sym_of(sec) or "", 1.0) else sec - 1  # 今の秒は、立ち下がり後に更新される
+    for _ in range(10):  # 呼出符号の秒はさかのぼる(その秒は更新されない)
+        if sym_of(u) != "C":
+            break
+        u -= 1
+    return format_lines(datetime.fromtimestamp(u, JST), khz, "TX")

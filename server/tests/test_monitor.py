@@ -77,6 +77,30 @@ class SegmentsTest(unittest.TestCase):
         self.assertEqual([o for o, *_ in emulate.segments("0", 3, True)], [0.0, PULSE_WIDTH["0"]])
 
 
+class LcdTest(unittest.TestCase):
+    # 2026-10-31 14:20:30 JST = 05:20:30 UTC
+    T = 1793424030
+
+    def test_updates_after_the_falling_edge(self):
+        before = emulate.lcd_lines(FRAME, self.T + 0.1, True, 60)   # 30 秒目('0'=0.8 秒)の途中: まだ前の秒
+        after = emulate.lcd_lines(FRAME, self.T + 0.9, True, 60)
+        self.assertEqual(before, ("2026-10-31 Sat  ", "14:20:29 60k TX "))
+        self.assertEqual(after, ("2026-10-31 Sat  ", "14:20:30 60k TX "))
+        self.assertTrue(all(len(x) == 16 for x in before + after))
+
+    def test_off_when_muted(self):
+        self.assertEqual(emulate.lcd_lines(FRAME, self.T + 0.1, False, 40)[1], "14:20:30 40k OFF")
+
+    def test_not_updated_during_callsign(self):
+        frame = ["M"] * 60
+        for i in range(40, 49):
+            frame[i] = "C"
+        t40 = self.T + 10  # 14:20:40
+        lines = emulate.lcd_lines("".join(frame), t40 + 5.5, True, 60)
+        self.assertEqual(lines[1], "14:20:39 60k TX ")  # 39 秒目の後は 49 秒目まで更新されない
+        self.assertEqual(emulate.lcd_lines("".join(frame), t40 + 9.5, True, 60)[1], "14:20:49 60k TX ")
+
+
 class FrameTest(unittest.TestCase):
     def test_decode_matches_encoder(self):
         for dt in (datetime(2026, 10, 31, 13, 49, tzinfo=JST), datetime(2000, 1, 1, 0, 0, tzinfo=JST),

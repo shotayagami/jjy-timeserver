@@ -139,13 +139,21 @@ class Monitor:
         self.text("state", 1440, 155, "", 42, TEXT, anchor="center", bold=True)
         self.text("sync1", 1010, 202, "", 24)
         self.text("sync2", 1010, 234, "", 22, DIM)
+        # 基板の LED(縦に詰めて並べる)と、LCD(16x2)の再現
         for i, (name, cap, sub) in enumerate((("d1", "D1 赤", "高レベル"), ("d2", "D2 黄緑", "信号(低レベル)"),
                                               ("d3", "D3 黄", "通電"))):
-            cx = 1130 + i * 280
-            self.items[name] = cv.create_oval(s(cx - 34), s(302 - 34), s(cx + 34), s(302 + 34), fill=LED_OFF[name],
+            cy = 296 + i * 34
+            self.items[name] = cv.create_oval(s(1022), s(cy - 12), s(1046), s(cy + 12), fill=LED_OFF[name],
                                               outline=EDGE, width=2)
-            self.label(cx, 340, cap, 24, TEXT, "n")
-            self.label(cx, 368, sub, 20, DIM, "n")
+            self.label(1060, cy, cap, 22, TEXT, "w")
+            self.label(1170, cy, sub, 20, DIM, "w")
+        self.label(1450, 268, "LCD(基板 J3)", 18, DIM)
+        cv.create_rectangle(s(1450), s(290), s(1860), s(380), fill="#10285f", outline=EDGE, width=2)
+        for row in range(2):
+            for col in range(16):
+                x, y = 1458 + col * 25, 296 + row * 40
+                cv.create_rectangle(s(x), s(y), s(x + 23), s(y + 37), fill="#1d44a0", outline="#16347c")
+                self.text(f"lcd{row}_{col}", x + 12, y + 19, "", 30, "#f2f6ff", anchor="center", bold=True, mono=True)
         self.text("edge", 1010, 394, "", 20, DIM)
 
         # フレーム全体と、各ビットの意味
@@ -252,6 +260,10 @@ class Monitor:
         for name in ("d1", "d2", "d3"):
             on = getattr(sig, name) if st else False
             self.cv.itemconfigure(self.items[name], fill=LED_ON[name] if on else LED_OFF[name])
+        lines = emulate.lcd_lines(frame if same_minute else None, now, carrier, st.get("khz", 60)) if st else ("", "")
+        for row, line in enumerate(lines):
+            for col in range(16):
+                self.set(f"lcd{row}_{col}", line[col] if col < len(line) else " ")
         rise, fall = (st or {}).get("rise_ms"), (st or {}).get("fall_ms")
         if carrier and rise is not None and fall is not None:
             self.set("edge", f"直近の実測({st['idx']} 秒目): 立ち上がり 秒頭 +{rise:.2f} ms / 立ち下がり {fall:.1f} ms"
