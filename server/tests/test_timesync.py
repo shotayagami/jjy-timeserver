@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from jjyd.timesync import SyncMonitor  # noqa: E402
+from jjyd.timesync import SyncMonitor, tracking_ok  # noqa: E402
 
 
 class Clock:
@@ -62,6 +62,29 @@ class RtcTest(unittest.TestCase):
             c.t += 900
             m.evaluate(True)
             self.assertEqual(float(f.read_text()), 5960)
+
+
+class TrackingTest(unittest.TestCase):
+    TAIL = "1761882134.1,{off},-0.0014,0.0143,12.859,-0.444,34.645,0.0249,0.0018,64.3,{leap}"
+
+    def line(self, refid, stratum, off=0.0022, leap="Normal"):
+        return f"{refid},,{stratum}," + self.TAIL.format(off=off, leap=leap)
+
+    def test_synced_to_a_real_source(self):
+        self.assertTrue(tracking_ok(self.line("8A0217CE", 3)))
+
+    def test_local_reference_is_not_synced(self):
+        # `local stratum 10`: 起動直後でも chrony は stratum 10 の自己参照で「同期済み」に見える
+        self.assertFalse(tracking_ok(self.line("7F7F0101", 10)))
+
+    def test_not_synchronised(self):
+        self.assertFalse(tracking_ok(self.line("00000000", 0, 0.0, "Not synchronised")))
+
+    def test_clock_still_wrong_before_the_step(self):
+        # 実機: 同期先を選んだ後、ステップ補正まで 160 秒ずれていた
+        self.assertFalse(tracking_ok(self.line("8A0217CE", 3, -160.5)))
+        self.assertTrue(tracking_ok(self.line("8A0217CE", 3, -0.2)))
+        self.assertFalse(tracking_ok(self.line("8A0217CE", 3, 0.3)))
 
 
 if __name__ == "__main__":

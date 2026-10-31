@@ -15,6 +15,8 @@ ProtectSystem=strict
 ReadWritePaths=/sys/class/pwm
 LimitRTPRIO=50
 StateDirectory=jjyd
+# lgpio(gpiozero)は作業ディレクトリに通知用のパイプを作る。ProtectSystem=strict では / に書けないので、書ける所を指定する。
+WorkingDirectory=/var/lib/jjyd
 
 [Install]
 WantedBy=multi-user.target

@@ -14,16 +14,28 @@ log = logging.getLogger("jjyd.timesync")
 PERSIST_INTERVAL_S = 900  # SD カードの書き込みを抑えるため15分に1回
 
 
+LOCAL_REFID = "7F7F0101"  # chrony の `local` 指令による自己参照(外部の時刻源に同期しているわけではない)
+MAX_OFFSET_S = 0.25       # システム時刻が NTP の時刻からこの秒数を超えてずれている間は、同期済みとみなさない
+
+
+def tracking_ok(line: str, max_offset_s: float = MAX_OFFSET_S) -> bool:
+    """`chronyc -c tracking` の 1 行から、送信してよい時刻かを判定する。
+
+    外部の時刻源に同期していて(`local stratum` の自己参照は除く)、システム時刻のずれが小さいこと。
+    起動直後は、同期先を選んだ後でもステップ補正が終わるまで時計が数分ずれていることがある。
+    """
+    # refid,name,stratum,reftime,sysoffset,lastoffset,rms,freq,resid,skew,rootdelay,rootdisp,interval,leap
+    f = line.strip().split(",")
+    refid, stratum, offset, leap = f[0], int(f[2]), float(f[4]), f[13]
+    return refid != LOCAL_REFID and 0 < stratum < 16 and leap != "Not synchronised" and abs(offset) <= max_offset_s
+
+
 def chrony_synced() -> bool:
-    """chronyc tracking が「同期済み」を示していれば True。"""
+    """chronyc tracking が「外部の時刻源に同期済みで、時計が合っている」ことを示していれば True。"""
     out = subprocess.run(
         ["chronyc", "-c", "tracking"], capture_output=True, text=True, timeout=5, check=True
-    ).stdout.strip()
-    f = out.split(",")
-    # refid,name,stratum,reftime,sysoffset,lastoffset,rms,freq,resid,skew,rootdelay,rootdisp,interval,leap
-    stratum = int(f[2])
-    leap = f[13]
-    return 0 < stratum < 16 and leap != "Not synchronised"
+    ).stdout
+    return tracking_ok(out)
 
 
 def rtc_present() -> bool:
