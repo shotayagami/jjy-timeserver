@@ -20,6 +20,8 @@ sed -i 's/^dtparam=audio=on/dtparam=audio=off/' "$CFG"
 mkdir -p /opt/timeserver
 cp -r "$ROOT/server" /opt/timeserver/
 install -m 644 "$ROOT/server/config/timeserver.conf" /etc/chrony/conf.d/timeserver.conf
+# Debian 既定の pool(海外のサーバを含む)は外し、NICT だけに同期する(複数の離れた時刻源が食い違うと、"no majority" で同期が外れる)
+sed -i 's/^pool 2\.debian\.pool\.ntp\.org/# &/' /etc/chrony/chrony.conf
 [ -f /etc/jjyd.toml ] || install -m 644 "$ROOT/server/config/jjyd.toml" /etc/jjyd.toml
 install -m 644 "$ROOT/server/systemd/jjyd.service" /etc/systemd/system/jjyd.service
 
