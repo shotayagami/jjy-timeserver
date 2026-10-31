@@ -47,3 +47,9 @@ file = "/usr/share/zoneinfo/leap-seconds.list"
 # false のときは15・45分も通常フレーム(年・曜日・うるう秒入り)を送る。電波時計の受信には false で十分。
 [callsign]
 enabled = false
+
+# 画面のモニタ(jjymon)へ渡す状態ファイル。秒ごとの送信が終わった後に書く。
+# 置き場所は jjyd.service の RuntimeDirectory(/run/jjyd)。変更するときは、読む側(jjymon --status)も合わせる。
+[status]
+enabled = true
+path = "/run/jjyd/status.json"

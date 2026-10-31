@@ -1,0 +1,109 @@
+import json
+import sys
+import tempfile
+import time
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from jjyd import main as M  # noqa: E402
+from jjyd.encoder import PULSE_WIDTH, callsign_keying  # noqa: E402
+from jjyd.status import StatusWriter  # noqa: E402
+from jjyd.timesync import SyncMonitor  # noqa: E402
+from jjymon import data, emulate  # noqa: E402
+
+FRAME = "M" + "10" * 29 + "M"  # 60 シンボル。1 秒目 = '1'、2 秒目 = '0'
+
+
+class EmulateTest(unittest.TestCase):
+    def test_pulse_widths_and_leds(self):
+        base = 60 * 1000  # idx 0
+        for idx, sym in ((0, "M"), (1, "1"), (2, "0")):
+            w = PULSE_WIDTH[sym]
+            hi = emulate.at(FRAME, base + idx + w - 0.01, True)
+            lo = emulate.at(FRAME, base + idx + w + 0.01, True)
+            self.assertEqual((hi.sym, hi.amplitude, hi.d1, hi.d2), (sym, 1.0, True, False))
+            self.assertEqual((lo.amplitude, lo.d1, lo.d2), (0.1, False, True))
+            self.assertTrue(lo.d3)
+
+    def test_second_start_is_high(self):
+        s = emulate.at(FRAME, 60 * 1000 + 5.0, True)
+        self.assertEqual((s.idx, s.sym, s.amplitude, s.d1), (5, FRAME[5], 1.0, True))
+
+    def test_muted_or_unknown(self):
+        s = emulate.at(FRAME, 60 * 1000 + 1.1, False)
+        self.assertEqual((s.amplitude, s.d1, s.d2), (0.0, False, False))
+        self.assertEqual(emulate.at(None, 60 * 1000 + 0.1, True).sym, "M")  # フレーム不明でも 0 秒目はマーカー
+        s = emulate.at(None, 60 * 1000 + 3.1, True)
+        self.assertEqual((s.sym, s.amplitude), (None, 0.0))
+
+    def test_callsign_follows_keying(self):
+        frame = ["M"] * 60
+        for i in range(40, 49):
+            frame[i] = "C"
+        frame = "".join(frame)
+        a, b = callsign_keying()[0]
+        on = emulate.at(frame, 60 * 1000 + 40 + (a + b) / 2, True)
+        off = emulate.at(frame, 60 * 1000 + 40 + a / 2, True)
+        self.assertEqual((on.amplitude, on.d1, on.d2), (1.0, True, False))
+        self.assertEqual((off.amplitude, off.d1, off.d2), (0.0, True, True))
+
+
+class DataTest(unittest.TestCase):
+    def test_parse_sources_real_output(self):
+        text = ("^,+,2001:df0:232:eea0::fff3,1,6,377,1,0.001298273,0.001298273,0.010219793\n"
+                "^,*,133.243.238.163,1,6,377,1,0.000422872,0.000422872,0.009444815\n")
+        s = data.parse_sources(text)
+        self.assertEqual((s[1]["state"], s[1]["name"], s[1]["stratum"], s[1]["reach"]), ("*", "133.243.238.163", 1, 0o377))
+        self.assertAlmostEqual(s[0]["offset"], 0.001298273)
+
+    def test_parse_tracking(self):
+        t = data.parse_tracking("85F3EEA3,133.243.238.163,2,1788000000.1,-0.0002,0.0001,0.0003,1.5,0.01,0.02,0.01,0.02,64.0,Normal")
+        self.assertEqual((t["stratum"], t["leap"], t["ref"]), (2, "Normal", "133.243.238.163"))
+        self.assertAlmostEqual(t["offset"], -0.0002)
+
+    def test_read_status_stale_and_broken(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "status.json"
+            self.assertIsNone(data.read_status(str(p)))
+            p.write_text("{broken")
+            self.assertIsNone(data.read_status(str(p)))
+            p.write_text(json.dumps({"time": 1000.0, "carrier": True}))
+            self.assertEqual(data.read_status(str(p), 1005.0)["carrier"], True)
+            self.assertIsNone(data.read_status(str(p), 1000.0 + data.STALE_S + 1))
+
+
+class StatusTest(unittest.TestCase):
+    def test_writer_is_atomic_and_gives_up(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "s.json"
+            w = StatusWriter(str(p))
+            w.write({"a": 1})
+            self.assertEqual(json.loads(p.read_text()), {"a": 1})
+            self.assertFalse(Path(str(p) + ".tmp").exists())
+            bad = StatusWriter(str(Path(d) / "no" / "such" / "s.json"))
+            for _ in range(5):
+                bad.write({"a": 1})
+            self.assertEqual(bad.fails, 3)  # 3 回で諦める
+
+    def test_sync_status(self):
+        t = [1000.0]
+        m = SyncMonitor(30, 21600, checker=lambda: False, wall=lambda: t[0], mono=lambda: t[0])
+        self.assertEqual(m.status()["age_s"], None)
+        m.evaluate(True)
+        t[0] += 12.34
+        st = m.status()
+        self.assertEqual((st["ok"], st["age_s"], st["limit_s"], st["mode"]), (False, 12.3, 21600, "ntp"))  # ok は run() が更新する
+
+    def test_send_pulse_reports_edges(self):
+        class Tx:
+            def __getattr__(self, name):
+                return lambda *a: None
+        start = time.time_ns()
+        rise, fall = M.send_pulse(Tx(), "M", start)
+        self.assertGreaterEqual(rise, 0)
+        self.assertAlmostEqual(fall, 200.0, delta=30)
+
+
+if __name__ == "__main__":
+    unittest.main()

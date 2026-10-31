@@ -64,6 +64,7 @@ class SyncMonitor(threading.Thread):
         self.last_ok: float | None = None
         self.last_persist = 0.0
         self.ok = False
+        self.synced = False  # 直近の確認で chrony が同期済みと答えたか(ok は保持時間も含めた送信可否)
         if state_file:
             self._restore()
 
@@ -94,6 +95,12 @@ class SyncMonitor(threading.Thread):
         except OSError as e:
             log.warning("cannot write %s: %s", self.state_file, e)
 
+    def status(self) -> dict:
+        """モニタ表示用: 送信可否、直近の確認結果、最後に同期を確認してからの秒数と許容秒数。"""
+        age = None if self.last_ok is None else round(self.mono() - self.last_ok, 1)
+        return {"ok": self.ok, "synced": self.synced, "age_s": age, "limit_s": self.limit,
+                "mode": "rtc" if self.state_file else "ntp"}
+
     def evaluate(self, synced: bool) -> bool:
         """1回分の判定。テストしやすいように run() から分離。"""
         if synced:
@@ -109,6 +116,7 @@ class SyncMonitor(threading.Thread):
             except Exception as e:  # chronyc 不在・タイムアウト等
                 log.warning("sync check failed: %s", e)
                 synced = False
+            self.synced = synced
             ok = self.evaluate(synced)
             if ok != self.ok:
                 log.info("time source %s", "OK -> transmit" if ok else "LOST -> carrier muted")

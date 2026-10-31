@@ -4,7 +4,7 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
 apt-get update
-apt-get install -y chrony python3-gpiozero python3-lgpio
+apt-get install -y chrony python3-gpiozero python3-lgpio python3-tk
 
 # 他のNTPクライアントと競合しないように
 systemctl disable --now systemd-timesyncd 2>/dev/null || true
@@ -25,6 +25,15 @@ sed -i 's/^pool 2\.debian\.pool\.ntp\.org/# &/' /etc/chrony/chrony.conf
 [ -f /etc/jjyd.toml ] || install -m 644 "$ROOT/server/config/jjyd.toml" /etc/jjyd.toml
 install -m 644 "$ROOT/server/systemd/jjyd.service" /etc/systemd/system/jjyd.service
 
+# 画面のモニタ(jjymon): 起動コマンドと、デスクトップへのログイン時の自動起動。Esc で終了。不要なら JJY_MONITOR=0 で実行
+if [ "${JJY_MONITOR:-1}" = "1" ]; then
+    install -m 755 "$ROOT/scripts/jjymon" /usr/local/bin/jjymon
+    install -d /etc/xdg/autostart
+    install -m 644 "$ROOT/scripts/jjymon.desktop" /etc/xdg/autostart/jjymon.desktop
+else
+    rm -f /usr/local/bin/jjymon /etc/xdg/autostart/jjymon.desktop
+fi
+
 # 基板上の DS3231 RTC を有効化する。RTC 未実装の基板なら JJY_RTC=0 で実行: sudo JJY_RTC=0 ./scripts/install.sh
 if [ "${JJY_RTC:-1}" = "1" ]; then
     grep -q '^dtoverlay=i2c-rtc,ds3231' "$CFG" || echo 'dtoverlay=i2c-rtc,ds3231' >> "$CFG"
@@ -38,7 +47,6 @@ else
     # RTC が無いと、起動時の時計は保存された時刻から始まる。systemd-timesyncd を止めると保存が止まるので、fake-hwclock で
     # 1 時間ごとと停止時に保存して、起動直後のずれを縮める(chrony が同期するまでの間の時計)。RTC がある構成では不要。
     apt-get install -y fake-hwclock
-    systemctl enable fake-hwclock 2>/dev/null || true
     fake-hwclock save || true
 fi
 

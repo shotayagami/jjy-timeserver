@@ -9,6 +9,7 @@ from datetime import datetime
 from .encoder import CALLSIGN_START, JST, PULSE_WIDTH, callsign_keying, encode_minute
 from .leap import DEFAULT_PATH, LeapSchedule
 from .lcd import DryRunLcd, Lcd, LinuxI2C, format_lines
+from .status import DEFAULT_PATH as STATUS_PATH, StatusWriter
 from .timesync import SyncMonitor, rtc_present
 from .transmitter import DryRunTransmitter, Transmitter
 
@@ -64,20 +65,45 @@ def send_callsign_second(tx, boundary: int, k: int, keying: list[tuple[float, fl
         tx.signal(True)
 
 
-def send_pulse(tx, sym: str, start: int, clock=None) -> None:
-    """start(clock の ns)から sym の幅だけ最大振幅にして、10% に戻す。"""
+def send_pulse(tx, sym: str, start: int, clock=None) -> tuple[float, float]:
+    """start(clock の ns)から sym の幅だけ最大振幅にして、10% に戻す。
+
+    戻り値: 実際に立ち上げた時刻と立ち下げた時刻の、start からの遅れ [ms](モニタ表示用)。
+    """
+    clock = clock or time.time_ns
     tx.signal(False)  # 高レベル(最大振幅)の間は消灯
     tx.level(True)
+    rise = clock()
     tx.key(True)  # 呼出符号の直後に搬送波を戻す(通常は何もしない)
     sleep_until(start + int(PULSE_WIDTH[sym] * S), clock)
     tx.level(False)
+    fall = clock()
     tx.signal(True)  # 低レベルの間(次の秒頭まで)点灯: ビット1=0.5s、ビット0=0.2s、マーカー=0.8s
+    return (rise - start) / 1e6, (fall - start) / 1e6
 
 
 def run(tx, monitor: SyncMonitor, stop: dict, display: Display | None = None,
-        leap: LeapSchedule | None = None, callsign: bool = False) -> None:
+        leap: LeapSchedule | None = None, callsign: bool = False, status: StatusWriter | None = None,
+        khz: int = 0) -> None:
     display = display or Display(None, 0)
     cur_minute, frame = None, None
+    minute_label = ""
+
+    def publish(boundary: int, idx: int | None = None, sym: str | None = None,
+                edges: tuple[float, float] | None = None) -> None:
+        """この秒の状態をモニタへ渡す。frame/minute は送信中のみ(止まっている間は null)。"""
+        if status is None:
+            return
+        status.write({
+            "version": 1, "pid": os.getpid(), "time": time.time(), "second": boundary // S, "khz": khz,
+            "carrier": tx.carrier_on, "sync": monitor.status(),
+            "minute": minute_label if tx.carrier_on else None,
+            "frame": "".join(frame) if tx.carrier_on and frame else None,
+            "idx": idx, "sym": sym,
+            "rise_ms": None if edges is None else round(edges[0], 3),
+            "fall_ms": None if edges is None else round(edges[1], 3),
+        })
+
     keying = callsign_keying()
     while not stop["flag"]:
         boundary = (time.time_ns() // S + 1) * S
@@ -94,6 +120,7 @@ def run(tx, monitor: SyncMonitor, stop: dict, display: Display | None = None,
         if not monitor.ok:
             tx.signal(False)
             display.update(now, "OFF")
+            publish(boundary)
             continue
 
         minute = boundary // (60 * S)
@@ -104,6 +131,7 @@ def run(tx, monitor: SyncMonitor, stop: dict, display: Display | None = None,
                 leap.reload_if_changed()
                 warn, last = leap.lookup(t)
             frame, cur_minute = encode_minute(t, warn, last, callsign), minute
+            minute_label = t.strftime("%Y-%m-%d %H:%M")
             if len(frame) != 60:
                 log.warning("leap second %s at the end of this minute", "insertion" if len(frame) > 60 else "deletion")
             log.info("frame %s JST", t.strftime("%Y-%m-%d %H:%M (%a)"))
@@ -114,12 +142,13 @@ def run(tx, monitor: SyncMonitor, stop: dict, display: Display | None = None,
         if sym == "C":  # 毎時15・45分の呼出符号
             send_callsign_second(tx, boundary, idx - CALLSIGN_START, keying)
             continue  # キーオフが秒境界の直前になる秒があるので LCD は更新しない
-        send_pulse(tx, sym, boundary)
+        edges = send_pulse(tx, sym, boundary)
         display.update(now, "TX")  # 信号の立ち下がり後に書く(送信タイミングを乱さない)
+        publish(boundary, idx, sym, edges)
         if idx == 59 and len(frame) == 61:  # うるう秒の挿入: 60 秒目を単調時計で送る
             start = mono0 + S
             sleep_until(start, time.monotonic_ns)
-            send_pulse(tx, frame[60], start, time.monotonic_ns)
+            publish(boundary + S, 60, frame[60], send_pulse(tx, frame[60], start, time.monotonic_ns))
             if time.time_ns() >= boundary + S:
                 log.warning("system clock did not repeat the leap second; chrony leapsecmode?")
 
@@ -145,6 +174,8 @@ def main() -> None:
     c, lv, ts = cfg.get("carrier", {}), cfg.get("level", {}), cfg.get("timesync", {})
     rtc, sg, lcd_cfg = cfg.get("rtc", {}), cfg.get("signal", {}), cfg.get("lcd", {})
     callsign = cfg.get("callsign", {}).get("enabled", False)  # 既定は送らない(README「呼出符号」参照)
+    status_cfg = cfg.get("status", {})
+    status = StatusWriter(status_cfg.get("path", STATUS_PATH)) if status_cfg.get("enabled", True) else None
     leap_cfg = cfg.get("leap", {})
     leap = LeapSchedule(path=leap_cfg.get("file", DEFAULT_PATH)) if leap_cfg.get("enabled", True) else None
 
@@ -182,7 +213,7 @@ def main() -> None:
 
     monitor.start()
     try:
-        run(tx, monitor, stop, Display(lcd, khz), leap, callsign)
+        run(tx, monitor, stop, Display(lcd, khz), leap, callsign, status, khz)
     finally:
         if lcd is not None:
             lcd.close()

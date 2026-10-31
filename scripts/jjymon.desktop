@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=JJY monitor
+Comment=jjyd と chrony の状態を全画面で表示
+Exec=/usr/local/bin/jjymon
+Terminal=false

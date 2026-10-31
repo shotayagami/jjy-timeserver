@@ -21,6 +21,7 @@ ntp.nict.jp ──NTP──▶ chrony ──システム時刻──▶ jjyd ─
 - **送信**: PWM0(GPIO18)が常時 40/60kHz を出し、GPIO23 が毎秒の頭で最大振幅にしてマーカー 0.2 s / "1" 0.5 s / "0" 0.8 s 後に 10% へ戻す。
 - **表示**: 基板の LCD(16×2、I2C)に毎秒、日付・曜日・時刻・送信周波数・送信状態を表示する(`[lcd]`)。
 - **送信信号 LED**: 低レベル期間だけ点灯する(ビット1=0.5秒、ビット0=0.2秒点灯して消灯、マーカー=0.8秒。`[signal]`)。
+- **画面のモニタ**(`jjymon`): Pi の HDMI 画面に、JST の時計、jjyd が今送っているパルス(直近 10 秒の搬送波の波形)、1 分 60 秒のフレーム全体(今の秒を強調)、基板の LED D1(赤・高レベル)・D2(黄緑・低レベル)・D3(黄・通電)の点灯の再現、chrony の同期状態と時刻源の一覧、サービスの状態・CPU 温度を出す。jjyd が秒ごとに `/run/jjyd/status.json`(`[status]`)へ書く状態を読み、送信のタイミングには影響しない。インストーラが `/usr/local/bin/jjymon` と `/etc/xdg/autostart/jjymon.desktop`(デスクトップへのログイン時に全画面で自動起動。Esc で終了、F11 で全画面の切替)を入れる。不要なら `JJY_MONITOR=0` でインストールする。手で試すときは `jjymon --windowed`。LED は、フレームと時刻から jjyd の規則(`send_pulse`)どおりに計算した再現で、基板の GPIO を読んだものではない(基板が無くても動く)。
 - **RTC が無い構成**(`JJY_RTC=0`): インストーラが `fake-hwclock` を入れ、時刻を 1 時間ごとと停止時に保存する(`systemd-timesyncd` を止めると、起動時の時計が古い保存時刻のままになるため)。起動直後のずれが縮まり、chrony が同期するまでの時計が実際に近くなる。jjyd は同期するまで送信しない。
 - **RTC**: 基板上の DS3231 + CR2032 を使い、再起動直後でも前回同期から 24 時間以内なら送信を続ける(`[rtc]`、既定で有効)。
 - **安全動作**: `chronyc tracking` が非同期なら送信停止。`local stratum 10` の自己参照(起動直後)や、同期先を選んだ後でもステップ補正が済むまで時計がずれている間(システム時刻のずれ 0.25 秒超)も、同期済みとみなさない(実機で起動直後に約 160 秒ずれていたため)。同期喪失後も `holdover_s`(既定6時間)までは送信継続。起動後に一度も同期していなければ送信しない。
@@ -42,6 +43,7 @@ cd server
 python -I tests/test_encoder.py        # エンコーダのラウンドトリップ/構造テスト
 python -I tests/test_timesync.py       # 同期監視と RTC の判定
 python -I tests/test_lcd_signal.py     # LCD 表示と信号 LED のタイミング
+python -I tests/test_monitor.py        # モニタ(信号の再現、状態ファイル、chronyc の解析)
 python -m jjyd --print-frame           # 現在の分のフレームを表示
 ```
 

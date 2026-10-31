@@ -1,0 +1,3 @@
+#!/bin/sh
+# 画面のモニタ(jjyd と chrony の状態表示)。--windowed で窓表示。
+PYTHONPATH=/opt/timeserver/server exec python3 -m jjymon "$@"
