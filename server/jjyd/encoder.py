@@ -56,7 +56,8 @@ def callsign_keying(text: str = "JJY", repeat: int = 2, unit: float = MORSE_UNIT
     return out
 
 
-def encode_minute(dt: datetime, leap: int = 0, leap_now: bool = False, callsign: bool = False) -> list[str]:
+def encode_minute(dt: datetime, leap: int = 0, leap_now: bool = False, callsign: bool = False,
+                  callsign_minutes: tuple[int, ...] = CALLSIGN_MINUTES) -> list[str]:
     """dt が属する分の JJY フレーム(通常 60要素)を返す。秒以下は無視する。
 
     leap: うるう秒予告(+1=挿入, -1=削除, 0=なし)。LS1/LS2 に反映する。
@@ -65,6 +66,7 @@ def encode_minute(dt: datetime, leap: int = 0, leap_now: bool = False, callsign:
     callsign: True のとき、毎時15・45分だけ呼出符号送出時のフレームにする(既定は False)。
       "JJY" は NICT の局の呼出符号かつ登録商標なので、明示的に有効にしない限り送らない。
       False なら15・45分も通常フレーム(年・曜日・LS入り)で、電波時計からはそのまま使える。
+    callsign_minutes: 呼出符号フレームにする分。実際の JJY は 15・45 分。変えるのは、画面などの試験(--dry-run)だけ。
     """
     dt = dt.astimezone(JST)
     sec = [0] * 60
@@ -86,7 +88,7 @@ def encode_minute(dt: datetime, leap: int = 0, leap_now: bool = False, callsign:
     put(30, _bits(yday % 10, 4))
     put(41, _bits(year // 10, 4))
     put(45, _bits(year % 10, 4))
-    callsign = callsign and minute in CALLSIGN_MINUTES
+    callsign = callsign and minute in callsign_minutes
     if callsign:
         put(50, list(ST_NONE))  # 曜日・うるう秒情報の代わりに停波予告 ST1〜ST6
     else:

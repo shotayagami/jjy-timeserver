@@ -6,7 +6,6 @@
 jjyd の状態ファイル(/run/jjyd/status.json)と chronyc、/proc・/sys を読むだけで、何も操作しない。
 """
 import argparse
-import collections
 import threading
 import time
 import tkinter as tk
@@ -53,7 +52,8 @@ class Monitor:
         self.info: dict = {}
         self.status: dict | None = None
         self.status_read = 0.0
-        self.history: collections.deque = collections.deque()
+        self.secs: dict = {}  # 秒 -> (シンボル, 秒の番号, 送信中か): 波形の描画用
+        self.wave_carrier = False
         self.items: dict = {}
         self.cache: dict = {}
         self.fonts: dict = {}
@@ -186,8 +186,7 @@ class Monitor:
         self.grid_lines = [(cv.create_line(0, 0, 0, 0, fill=EDGE), cv.create_text(0, 0, fill=DIM, font=self.font(16), anchor="n"))
                            for _ in range(int(WAVE_S) + 2)]
         for name, color in (("amp", "#6ad6ff"), ("d1", "#ff5c5c"), ("d2", "#9be83a")):
-            self.items["w_" + name] = cv.create_line(0, 0, 0, 0, fill=color, width=max(2, int(s(3))))
-        self.history.clear()
+            self.items["w_" + name] = cv.create_line(0, 0, 0, 0, fill=color, width=max(2, int(s(2))))
 
         # chrony
         self.panel(30, 820, 560, 240, "chrony(時刻の同期)")
@@ -214,7 +213,7 @@ class Monitor:
             if self.items:
                 self._update(time.time())
         finally:
-            self.root.after(33, self._tick)
+            self.root.after(16, self._tick)
 
     def _update(self, now: float) -> None:
         if now - self.status_read > 0.2:
@@ -261,6 +260,7 @@ class Monitor:
             self.set("edge", "")
 
         self._update_frame(st if same_minute else None, st, carrier, sig)
+        self.wave_carrier = carrier
         self._update_wave(now, sig)
         self._update_chrony(now, info)
 
@@ -334,38 +334,53 @@ class Monitor:
             self.cv.itemconfigure(bg, fill=CELL if key == here else PANEL)
 
     def _update_wave(self, now: float, sig) -> None:
-        h = self.history
-        h.append((now, sig.amplitude, sig.d1, sig.d2))
-        while h and h[0][0] < now - WAVE_S - 1:
-            h.popleft()
-        x0, x1, k = self.wx0, self.wx1, self.k
-        px = lambda t: self.s(x0 + (t - (now - WAVE_S)) / WAVE_S * (x1 - x0))  # noqa: E731
-        for name, val in (("amp", lambda r: r[1]), ("d1", lambda r: 1.0 if r[2] else 0.0), ("d2", lambda r: 1.0 if r[3] else 0.0)):
-            top, bot = self.lanes[name]
-            py = lambda v: self.s(bot - 6 - v * (bot - top - 12))  # noqa: E731
-            pts, prev = [], None
-            for r in h:
-                if r[0] < now - WAVE_S:
-                    continue
-                v = val(r)
-                if prev is not None and v != prev:
-                    pts += [px(r[0]), py(prev)]  # 階段状に描く
-                pts += [px(r[0]), py(v)]
-                prev = v
-            if len(pts) >= 4:
-                self.cv.coords(self.items["w_" + name], *pts)
-        first = int((now - WAVE_S) // 1) + 1
+        """直近 WAVE_S 秒の波形。秒ごとの記録(シンボルと送信中か)から、変化の位置を正確に計算して描く(標本点をつなぐのではない)。"""
+        sec = int(now // 1)
+        if sig.sym is not None or sec not in self.secs:
+            self.secs[sec] = (sig.sym, sig.idx, self.wave_carrier)
+        for old in [t for t in self.secs if t < sec - WAVE_S - 2]:
+            del self.secs[old]
+        t0 = now - WAVE_S
+        x0, x1 = self.s(self.wx0), self.s(self.wx1)
+        scale = (x1 - x0) / WAVE_S
+        lanes = (("amp", 1), ("d1", 2), ("d2", 3))
+        pts = {name: [] for name, _ in lanes}
+        for t_sec in range(int(t0 // 1), sec + 1):
+            sym, idx, car = self.secs.get(t_sec, (None, 0, False))
+            for off, amp, d1, d2 in emulate.segments(sym, idx, car):
+                t = t_sec + off
+                if t > now:
+                    break
+                x = x0 + (max(t, t0) - t0) * scale
+                for name, v in (("amp", amp), ("d1", 1.0 if d1 else 0.0), ("d2", 1.0 if d2 else 0.0)):
+                    p = pts[name]
+                    if p:
+                        p += [x, p[-1]]  # 階段状: 前の値のまま変化の位置まで進めてから、新しい値へ
+                    p += [x, self._lane_y(name, v)]
+        for name, _ in lanes:
+            p = pts[name]
+            if len(p) >= 2:
+                p += [x1, p[-1]]  # 現在(右端)まで
+            if len(p) >= 4:
+                self.cv.coords(self.items["w_" + name], *p)
+        first = int(t0 // 1) + 1
         for i, (ln, tx) in enumerate(self.grid_lines):
-            sec = first + i
-            x = px(sec)
-            if x < self.s(x0) or x > self.s(x1):
+            t = first + i
+            x = x0 + (t - t0) * scale
+            if x < x0 or x > x1:
                 self.cv.coords(ln, -10, -10, -10, -10)
-                self.cv.itemconfigure(tx, text="")
+                self.cv.coords(tx, -100, -100)
                 continue
             self.cv.coords(ln, x, self.s(self.lanes["amp"][0]), x, self.s(self.lanes["d2"][1]))
             self.cv.coords(tx, x, self.s(764))
-            self.cv.itemconfigure(tx, text=str(sec % 60))
-            self.cv.tag_lower(ln)
+            label = str(t % 60)
+            if self.cache.get(("g", tx)) != label:  # 文字の描画は重い(Pi では 1 個ごとに数 ms)ので、変わったときだけ
+                self.cache[("g", tx)] = label
+                self.cv.itemconfigure(tx, text=label)
+
+    def _lane_y(self, name: str, v: float) -> float:
+        top, bot = self.lanes[name]
+        return self.s(bot - 6 - v * (bot - top - 12))
 
     def _update_chrony(self, now: float, info: dict) -> None:
         t = info.get("tracking")

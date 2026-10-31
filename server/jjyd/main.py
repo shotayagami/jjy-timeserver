@@ -6,7 +6,7 @@ import time
 import tomllib
 from datetime import datetime
 
-from .encoder import CALLSIGN_START, JST, PULSE_WIDTH, callsign_keying, encode_minute
+from .encoder import CALLSIGN_MINUTES, CALLSIGN_START, JST, PULSE_WIDTH, callsign_keying, encode_minute
 from .leap import DEFAULT_PATH, LeapSchedule
 from .lcd import DryRunLcd, Lcd, LinuxI2C, format_lines
 from .status import DEFAULT_PATH as STATUS_PATH, StatusWriter
@@ -84,7 +84,7 @@ def send_pulse(tx, sym: str, start: int, clock=None) -> tuple[float, float]:
 
 def run(tx, monitor: SyncMonitor, stop: dict, display: Display | None = None,
         leap: LeapSchedule | None = None, callsign: bool = False, status: StatusWriter | None = None,
-        khz: int = 0) -> None:
+        khz: int = 0, callsign_minutes: tuple[int, ...] = CALLSIGN_MINUTES) -> None:
     display = display or Display(None, 0)
     cur_minute, frame = None, None
     minute_label = ""
@@ -130,7 +130,7 @@ def run(tx, monitor: SyncMonitor, stop: dict, display: Display | None = None,
             if leap is not None:
                 leap.reload_if_changed()
                 warn, last = leap.lookup(t)
-            frame, cur_minute = encode_minute(t, warn, last, callsign), minute
+            frame, cur_minute = encode_minute(t, warn, last, callsign, callsign_minutes), minute
             minute_label = t.strftime("%Y-%m-%d %H:%M")
             if len(frame) != 60:
                 log.warning("leap second %s at the end of this minute", "insertion" if len(frame) > 60 else "deletion")
@@ -140,6 +140,8 @@ def run(tx, monitor: SyncMonitor, stop: dict, display: Display | None = None,
             continue
         sym = frame[idx]
         if sym == "C":  # 毎時15・45分の呼出符号
+            if idx == CALLSIGN_START:
+                publish(boundary, idx, sym)  # 呼出符号の間(9 秒)は書かないので、その前に 1 回(最初のキーオンは 0.5 秒以上後)
             send_callsign_second(tx, boundary, idx - CALLSIGN_START, keying)
             continue  # キーオフが秒境界の直前になる秒があるので LCD は更新しない
         edges = send_pulse(tx, sym, boundary)
@@ -157,10 +159,15 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="JJY time code transmitter")
     ap.add_argument("-c", "--config", default="/etc/jjyd.toml")
     ap.add_argument("--dry-run", action="store_true", help="GPIO を使わずログだけ出す")
+    ap.add_argument("--status", help="状態ファイルの置き場所(設定の [status] path を上書き。画面の試験用)")
+    ap.add_argument("--test-callsign-every", type=int, metavar="N",
+                    help="試験用(--dry-run のみ): 呼出符号のフレームを、毎時 0 分から N 分ごとに送る(実際は 15・45 分)")
     ap.add_argument("--print-frame", action="store_true", help="現在の分のフレームを表示して終了")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    if args.test_callsign_every is not None and not (args.dry_run and 1 <= args.test_callsign_every <= 60):
+        ap.error("--test-callsign-every は --dry-run と一緒に、1〜60 分で指定する")
 
     if args.print_frame:
         f = encode_minute(datetime.now(JST))
@@ -175,7 +182,7 @@ def main() -> None:
     rtc, sg, lcd_cfg = cfg.get("rtc", {}), cfg.get("signal", {}), cfg.get("lcd", {})
     callsign = cfg.get("callsign", {}).get("enabled", False)  # 既定は送らない(README「呼出符号」参照)
     status_cfg = cfg.get("status", {})
-    status = StatusWriter(status_cfg.get("path", STATUS_PATH)) if status_cfg.get("enabled", True) else None
+    status = StatusWriter(args.status or status_cfg.get("path", STATUS_PATH)) if status_cfg.get("enabled", True) or args.status else None
     leap_cfg = cfg.get("leap", {})
     leap = LeapSchedule(path=leap_cfg.get("file", DEFAULT_PATH)) if leap_cfg.get("enabled", True) else None
 
@@ -188,6 +195,10 @@ def main() -> None:
     monitor = SyncMonitor(ts.get("check_interval_s", 30), ts.get("holdover_s", 21600),
                           state_file=state_file, rtc_holdover_s=rtc.get("holdover_s", 86400))
     khz = c.get("khz", 60)
+    callsign_minutes = CALLSIGN_MINUTES
+    if args.test_callsign_every:  # 試験: 呼出符号のフレームを N 分ごとに(実際の送信では使えない)
+        callsign, callsign_minutes = True, tuple(range(0, 60, args.test_callsign_every))
+        log.warning("TEST: call-sign frames at minutes %s (real JJY: 15 and 45)", list(callsign_minutes))
     lcd = None
     if args.dry_run:
         monitor.checker = lambda: True
@@ -213,7 +224,7 @@ def main() -> None:
 
     monitor.start()
     try:
-        run(tx, monitor, stop, Display(lcd, khz), leap, callsign, status, khz)
+        run(tx, monitor, stop, Display(lcd, khz), leap, callsign, status, khz, callsign_minutes)
     finally:
         if lcd is not None:
             lcd.close()

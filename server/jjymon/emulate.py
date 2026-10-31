@@ -20,17 +20,33 @@ class Signal:
     d3: bool = True            # 黄 LED: 通電表示(常時点灯)
 
 
-def at(frame: str | None, now: float, carrier: bool) -> Signal:
-    """now(UNIX 秒)の信号。frame はその分の 60 シンボル(MARKER/1/0/C)で、無ければ None。"""
-    sec = int(now // 1)
-    phase = now - sec
-    idx = sec % 60
-    sym = frame[idx] if frame and idx < len(frame) else ("M" if idx == 0 else None)
+def _state(sym: str | None, idx: int, phase: float, carrier: bool) -> tuple[float, bool, bool]:
+    """秒の頭から phase 秒後の (振幅, D1, D2)。"""
     if not carrier or sym is None:
-        return Signal(idx, sym, 0.0, False, False)
+        return 0.0, False, False
     if sym == "C":  # 呼出符号: 搬送波を 0%/100% でキーイング。最大振幅のまま、キーオン中は D2 が消える
         k = idx - CALLSIGN_START + phase
         on = any(a <= k < b for a, b in _KEYING)
-        return Signal(idx, sym, 1.0 if on else 0.0, True, not on)
+        return (1.0 if on else 0.0), True, not on
     high = phase < PULSE_WIDTH[sym]
-    return Signal(idx, sym, 1.0 if high else 0.1, high, not high)
+    return (1.0 if high else 0.1), high, not high
+
+
+def at(frame: str | None, now: float, carrier: bool) -> Signal:
+    """now(UNIX 秒)の信号。frame はその分の 60 シンボル(MARKER/1/0/C)で、無ければ None。"""
+    sec = int(now // 1)
+    idx = sec % 60
+    sym = frame[idx] if frame and idx < len(frame) else ("M" if idx == 0 else None)
+    amp, d1, d2 = _state(sym, idx, now - sec, carrier)
+    return Signal(idx, sym, amp, d1, d2)
+
+
+def segments(sym: str | None, idx: int, carrier: bool) -> list[tuple[float, float, bool, bool]]:
+    """1 秒の間の信号の変化を [(秒の頭からの時刻, 振幅, D1, D2), ...] で返す(次の変化まで、その値が続く)。波形を正確な位置で描くのに使う。"""
+    cuts = [0.0]
+    if carrier and sym == "C":
+        k0 = idx - CALLSIGN_START
+        cuts += sorted({x for a, b in _KEYING for x in (a - k0, b - k0) if 0 < x < 1})
+    elif carrier and sym is not None:
+        cuts.append(PULSE_WIDTH[sym])
+    return [(c, *_state(sym, idx, c + 1e-9, carrier)) for c in cuts]

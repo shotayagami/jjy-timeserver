@@ -45,6 +45,9 @@ python -I tests/test_timesync.py       # 同期監視と RTC の判定
 python -I tests/test_lcd_signal.py     # LCD 表示と信号 LED のタイミング
 python -I tests/test_monitor.py        # モニタ(信号の再現、状態ファイル、chronyc の解析)
 python -m jjyd --print-frame           # 現在の分のフレームを表示
+# 画面の試験: 呼出符号のフレームを 20 分ごと(毎時 0・20・40 分)に出す。GPIO は使わず、状態は別のファイルへ書くので、動いている jjyd や jjymon には影響しない
+python -m jjyd --dry-run --test-callsign-every 20 --status /tmp/jjy-test.json &
+python -m jjymon --status /tmp/jjy-test.json --windowed
 ```
 
 ## 法令・商標

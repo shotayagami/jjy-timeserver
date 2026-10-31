@@ -51,6 +51,32 @@ class EmulateTest(unittest.TestCase):
         self.assertEqual((off.amplitude, off.d1, off.d2), (0.0, True, True))
 
 
+class SegmentsTest(unittest.TestCase):
+    def check(self, frame, idx):
+        sym = frame[idx]
+        segs = emulate.segments(sym, idx, True)
+        self.assertEqual(segs[0][0], 0.0)
+        for i, (off, amp, d1, d2) in enumerate(segs):  # 各区間の始めと終わり直前で、at() と同じ値
+            end = segs[i + 1][0] if i + 1 < len(segs) else 1.0
+            for ph in (off + 1e-6, end - 1e-6):
+                s = emulate.at(frame, 60 * 1000 + idx + ph, True)
+                self.assertEqual((s.amplitude, s.d1, s.d2), (amp, d1, d2), (idx, ph))
+
+    def test_matches_at(self):
+        for idx in (0, 1, 2, 9, 30):
+            self.check(FRAME, idx)
+        call = ["M"] * 60
+        for i in range(40, 49):
+            call[i] = "C"
+        for idx in range(40, 49):
+            self.check("".join(call), idx)
+
+    def test_muted_and_unknown_are_flat(self):
+        self.assertEqual(emulate.segments("1", 3, False), [(0.0, 0.0, False, False)])
+        self.assertEqual(emulate.segments(None, 3, True), [(0.0, 0.0, False, False)])
+        self.assertEqual([o for o, *_ in emulate.segments("0", 3, True)], [0.0, PULSE_WIDTH["0"]])
+
+
 class FrameTest(unittest.TestCase):
     def test_decode_matches_encoder(self):
         for dt in (datetime(2026, 10, 31, 13, 49, tzinfo=JST), datetime(2000, 1, 1, 0, 0, tzinfo=JST),
@@ -73,6 +99,14 @@ class FrameTest(unittest.TestCase):
         self.assertEqual((d["min"], d["hour"], d["year"], d["wday"], d["ls"]), (15, 13, None, None, None))
         lay = fr.layout(True)
         self.assertEqual((lay[44][0], lay[50], lay[55]), ("call", ("st", "ST1"), ("st", "ST6")))
+
+    def test_callsign_minutes_can_be_changed_for_tests(self):
+        every20 = (0, 20, 40)
+        for minute, expect in ((0, True), (20, True), (40, True), (15, False), (45, False)):
+            f = "".join(encode_minute(datetime(2026, 10, 31, 14, minute, tzinfo=JST), callsign=True, callsign_minutes=every20))
+            self.assertEqual(fr.is_callsign(f), expect, minute)
+        f = "".join(encode_minute(datetime(2026, 10, 31, 14, 15, tzinfo=JST), callsign=True))  # 既定は 15・45 分
+        self.assertTrue(fr.is_callsign(f))
 
     def test_layout_covers_every_second_and_weights_sum(self):
         lay = fr.layout()
